@@ -5,217 +5,237 @@
 '''
 
 from queue import Queue
-
 from .constants import *
 
+
 class Tile(object):
-	def __init__(self, gamemap, x, y):
-		# Public Properties
-		self.x = x					# Integer X Coordinate
-		self.y = y					# Integer Y Coordinate
-		self.tile = TILE_FOG		# Integer Tile Type (TILE_OBSTACLE, TILE_FOG, TILE_MOUNTAIN, TILE_EMPTY, or player_ID)
-		self.turn_captured = 0		# Integer Turn Tile Last Captured
-		self.turn_held = 0			# Integer Last Turn Held
-		self.army = 0				# Integer Army Count
-		self.isCity = False			# Boolean isCity
-		self.isSwamp = False		# Boolean isSwamp
-		self.isGeneral = False		# Boolean isGeneral
+    def __init__(self, board, x, y):
+        # Public Properties
+        self.x = x                # Integer X Coordinate
+        self.y = y                # Integer Y Coordinate
+        self.type = TILE_FOG      # Integer Tile Type (TILE_OBSTACLE, TILE_FOG, TILE_MOUNTAIN, TILE_EMPTY, or player_ID)
+        self.turn_captured = 0    # Integer Turn Tile Last Captured
+        self.turn_held = 0        # Integer Last Turn Held
+        self.army = 0             # Integer Army Count
+        self.is_city = False      # Boolean is_city
+        self.is_general = False   # Boolean is_general
 
-		# Private Properties
-		self._map = gamemap			# Pointer to Map Object
-		self._general_index = -1	# Player Index if tile is a general
+        # Private Properties
+        self._board = board       # Pointer to Board Object
+        self._general_index = -1  # Player Index if tile is a general
 
-	def __repr__(self):
-		return "(%d,%d) %d (%d)" % (self.x, self.y, self.tile, self.army)
+    def __repr__(self):
+        return "(%d,%d) %d (%d)" % (self.x, self.y, self.type, self.army)
 
-	'''def __eq__(self, other):
-			return (other != None and self.x==other.x and self.y==other.y)'''
+    def __lt__(self, other):
+        return self.army < other.army
 
-	def __lt__(self, other):
-			return self.army < other.army
+    def serialize(self):
+        return {
+            'x': self.x,
+            'y': self.y,
+            'type': self.type,
+            'army': self.army,
+            'isCity': self.is_city,
+            'isGeneral': self.is_general
+        }
 
-	def setNeighbors(self, gamemap):
-		self._map = gamemap
-		self._setNeighbors()
+    def set_neighbors(self, board):
+        self._board = board
+        self._set_neighbors()
 
-	def setIsSwamp(self, isSwamp):
-		self.isSwamp = isSwamp
+    def update(self, board, new_tile_type, army, is_city=False, is_general=False):
+        """
+        given parameters for new tile, update state and parent state
+        """
+        self._board = board
 
-	def update(self, gamemap, tile, army, isCity=False, isGeneral=False):
-		self._map = gamemap
+        if (self.type < 0 or new_tile_type >= TILE_MOUNTAIN
+            or (new_tile_type < TILE_MOUNTAIN and self.is_self())):  # Tile should be updated
+            if (new_tile_type >= 0 or self.type >= 0) and self.type != new_tile_type:  # Remember Discovered Tiles
+                self.turn_captured = board.turn
+                if self.type >= 0:
+                    board.tiles[self.type].remove(self)
+                if new_tile_type >= 0:
+                    board.tiles[new_tile_type].append(self)
+            if new_tile_type == board.player_index:
+                self.turn_held = board.turn
+            self.type = new_tile_type
+        if self.army == 0 or army > 0 or new_tile_type >= TILE_MOUNTAIN:  # Remember Discovered Armies
+            self.army = army
 
-		if self.tile < 0 or tile >= TILE_MOUNTAIN or (tile < TILE_MOUNTAIN and self.isSelf()): # Tile should be updated
-			if (tile >= 0 or self.tile >= 0) and self.tile != tile: # Remember Discovered Tiles
-				self.turn_captured = gamemap.turn
-				if self.tile >= 0:
-					gamemap.tiles[self.tile].remove(self)
-				if tile >= 0:
-					gamemap.tiles[tile].append(self)
-			if tile == gamemap.player_index:
-				self.turn_held = gamemap.turn
-			self.tile = tile
-		if self.army == 0 or army > 0 or tile >= TILE_MOUNTAIN or self.isSwamp: # Remember Discovered Armies
-			self.army = army
+        if is_city:
+            self.is_city = True
+            if self not in board.cities:
+                board.cities.append(self)
 
-		if isCity:
-			self.isCity = True
-			self.isGeneral = False
-			if self not in gamemap.cities:
-				gamemap.cities.append(self)
-			if self._general_index != -1 and self._general_index < 8:
-				gamemap.generals[self._general_index] = None
-				self._general_index = -1
-		elif isGeneral:
-			self.isGeneral = True
-			gamemap.generals[tile] = self
-			self._general_index = self.tile
+            assert(not is_general)
+            assert(self._general_index == -1)
+            # mark as not general unclear why necessary
+            # self.is_general = False
+            # if self._general_index != -1 and self._general_index < 8:
+            #     board.generals[self._general_index] = None
+            #     self._general_index = -1
+        elif is_general:
+            self.is_general = True
+            board.generals[new_tile_type] = self
+            self._general_index = self.type
 
-	################################ Tile Properties ################################
+    ################################ Tile Properties ################################
 
-	def distance_to(self, dest):
-		if dest != None:
-			return abs(self.x - dest.x) + abs(self.y - dest.y)
-		return 0
+    def is_self(self):
+        return (self._board.player_index is None            # Game master's board--does not belong to player
+                or self.type == self._board.player_index)   # Player's board
 
-	def neighbors(self, includeSwamps=False, includeCities=True):
-		neighbors = []
-		for tile in self._neighbors:
-			if (tile.tile != TILE_OBSTACLE or tile.isCity or tile.isGeneral) and tile.tile != TILE_MOUNTAIN and (includeSwamps or not tile.isSwamp) and (includeCities or not tile.isCity):
-				neighbors.append(tile)
-		return neighbors
+    def distance_to(self, dest):
+        if dest is not None:
+            return abs(self.x - dest.x) + abs(self.y - dest.y)
+        return 0
 
-	def isValidTarget(self): # Check tile to verify reachability
-		if self.tile < TILE_EMPTY:
-			return False
-		for tile in self.neighbors(includeSwamps=True):
-			if tile.turn_held > 0:
-				return True
-		return False
+    def copy(self, tile):
+        if tile.is_city and not self.is_city:
+            self._board.cities.append(self)
+        elif not tile.is_city and self.is_city:
+            self._board.cities.remove(self)
 
-	def isSelf(self):
-		return self.tile == self._map.player_index
+        if tile.is_general and not self.is_general:
+            self._board.generals[tile.type] = self  # if tile is general then type must be player index
 
-	def isOnTeam(self):
-		if self.isSelf():
-			return True
-		return False
+        self.type = tile.type
+        self.army = tile.army
+        self.is_city = tile.is_city
+        self.is_general = tile.is_general
+        self.turn_captured = tile.turn_captured
+        self.turn_held = tile.turn_held
 
-	def shouldNotAttack(self):
-		if self.isOnTeam():
-			return True
-		if self.tile in self._map.do_not_attack_players:
-			return True
-		return False
+    def neighbors(self, include_cities=True):
+        neighbors = []
+        for tile in self._neighbors:
+            if (tile.type != TILE_OBSTACLE or tile.is_city or tile.is_general) \
+                    and tile.type != TILE_MOUNTAIN \
+                    and (include_cities or not tile.is_city):
+                neighbors.append(tile)
+        return neighbors
 
-	################################ Select Other Tiles ################################
+    def isValidTarget(self):  # Check tile to verify reachability
+        if self.type < TILE_EMPTY:
+            return False
+        for tile in self.neighbors():
+            if tile.turn_held > 0:
+                return True
+        return False
 
-	def nearest_tile_in_path(self, path):
-		dest = None
-		dest_distance = 9999
-		for tile in path:
-			distance = self.distance_to(tile)
-			if distance < tile_distance:
-				dest = tile
-				dest_distance = distance
+    def is_on_team(self):
+        return self.is_self()
 
-		return dest
+    def shouldNotAttack(self):
+        if self.is_on_team():
+            return True
+        if self.type in self._board.do_not_attack_players:
+            return True
+        return False
 
-	def nearest_target_tile(self):
-		max_target_army = self.army * 2 + 14
+    ################################ Select Other Tiles ################################
 
-		dest = None
-		dest_distance = 9999
-		for x in range(self._map.cols): # Check Each Square
-			for y in range(self._map.rows):
-				tile = self._map.grid[y][x]
-				if not tile.isValidTarget() or tile.shouldNotAttack() or tile.army > max_target_army: # Non Target Tiles
-					continue
+    def nearest_target_tile(self):
+        max_target_army = self.army * 2 + 14
 
-				distance = self.distance_to(tile)
-				if tile.isGeneral: # Generals appear closer
-					distance = distance * 0.09
-				elif tile.isCity: # Cities vary distance based on size, but appear closer
-					distance = distance * sorted((0.17, (tile.army / (3.2*self.army)), 20))[1]
+        dest = None
+        dest_distance = 9999
+        for x in range(self._board.cols):  # Check Each Square
+            for y in range(self._board.rows):
+                tile = self._board.grid[y][x]
+                if not tile.isValidTarget() or tile.shouldNotAttack() or tile.army > max_target_army:  # Non Target Tiles
+                    continue
 
-				if tile.tile == TILE_EMPTY: # Empties appear further away
-					distance = distance * 4.3
-				if tile.army > self.army: # Larger targets appear further away
-					distance = distance * (1.5*tile.army/self.army)
-				if tile.isSwamp: # Swamps appear further away
-					distance = distance * 10
-					if tile.turn_held > 0: # Swamps which have been held appear even further away
-						distance = distance * 20
+                distance = self.distance_to(tile)
+                if tile.is_general:  # Generals appear closer
+                    distance = distance * 0.09
+                elif tile.is_city:  # Cities vary distance based on size, but appear closer
+                    distance = distance * sorted((0.17, (tile.army / (3.2 * self.army)), 20))[1]
 
-				if distance < dest_distance:
-					dest = tile
-					dest_distance = distance
+                if tile.tile == TILE_EMPTY:  # Empties appear further away
+                    distance = distance * 4.3
+                if tile.army > self.army:  # Larger targets appear further away
+                    distance = distance * (1.5 * tile.army / self.army)
+                if distance < dest_distance:
+                    dest = tile
+                    dest_distance = distance
 
-		return dest
+        return dest
 
-	################################ Pathfinding ################################
+    ################################ Pathfinding ################################
 
-	def path_to(self, dest, includeCities=False):
-		if dest == None:
-			return []
+    def path_to(self, dest, include_cities=False):
+        if dest == None:
+            return []
 
-		frontier = Queue()
-		frontier.put(self)
-		came_from = {}
-		came_from[self] = None
-		army_count = {}
-		army_count[self] = self.army
+        frontier = Queue()
+        frontier.put(self)
+        came_from = {}
+        came_from[self] = None
+        army_count = {}
+        army_count[self] = self.army
 
-		while not frontier.empty():
-			current = frontier.get()
+        while not frontier.empty():
+            current = frontier.get()
 
-			if current == dest: # Found Destination
-				break
+            if current == dest:  # Found Destination
+                break
 
-			for next in current.neighbors(includeSwamps=True, includeCities=includeCities):
-				if next not in came_from and (next.isOnTeam() or next == dest or next.army < army_count[current]):
-					#priority = self.distance(next, dest)
-					frontier.put(next)
-					came_from[next] = current
-					if next.isOnTeam():
-						army_count[next] = army_count[current] + (next.army - 1)
-					else:
-						army_count[next] = army_count[current] - (next.army + 1)
+            for next in current.neighbors(include_cities=include_cities):
+                if next not in came_from and (next.is_on_team() or next == dest or next.army < army_count[current]):
+                    # priority = self.distance(next, dest)
+                    frontier.put(next)
+                    came_from[next] = current
+                    if next.is_on_team():
+                        army_count[next] = army_count[current] + (next.army - 1)
+                    else:
+                        army_count[next] = army_count[current] - (next.army + 1)
 
-		if dest not in came_from: # Did not find dest
-			if includeCities:
-				return []
-			else:
-				return self.path_to(dest, includeCities=True)
+        # if game master is caller
+        if self._board.player_index is None:
+            if dest not in came_from:
+                return False
+            return True
 
-		# Create Path List
-		path = _path_reconstruct(came_from, dest)
+        # if player is caller
+        if dest not in came_from:  # Did not find dest
+            if include_cities:
+                return []
+            else:
+                return self.path_to(dest, include_cities=True)
 
-		return path
+        # Create Path List
+        path = _path_reconstruct(came_from, dest)
 
-	################################ PRIVATE FUNCTIONS ################################
+        return path
 
-	def _setNeighbors(self):
-		x = self.x
-		y = self.y
+    ################################ PRIVATE FUNCTIONS ################################
 
-		neighbors = []
-		for dy, dx in DIRECTIONS:
-			if self._map.isValidPosition(x+dx, y+dy):
-				tile = self._map.grid[y+dy][x+dx]
-				neighbors.append(tile)
+    def _set_neighbors(self):
+        x = self.x
+        y = self.y
 
-		self._neighbors = neighbors
-		return neighbors
+        neighbors = []
+        for dy, dx in DIRECTIONS:
+            if self._board.is_valid_position(x + dx, y + dy):
+                tile = self._board.grid[y + dy][x + dx]
+                neighbors.append(tile)
+
+        self._neighbors = neighbors
+        return neighbors
+
 
 def _path_reconstruct(came_from, dest):
-	current = dest
-	path = [current]
-	try:
-		while came_from[current] != None:
-			current = came_from[current]
-			path.append(current)
-	except KeyError:
-		None
-	path.reverse()
+    current = dest
+    path = [current]
+    try:
+        while came_from[current] != None:
+            current = came_from[current]
+            path.append(current)
+    except KeyError:
+        pass
+    path.reverse()
 
-	return path
+    return path

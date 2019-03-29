@@ -59,6 +59,7 @@ PRE_HELP_TEXT = [
 	"| swamp 0.5: set swamp value for normal map",
 	"| Code available at: git.io/myssix",
 ]
+
 GAME_HELP_TEXT = [
 	"| ======= Available Commands =======",
 	"| team: request not to be attacked",
@@ -67,6 +68,7 @@ GAME_HELP_TEXT = [
 	"| unpause: unpause army movement",
 	"| Code available at: git.io/myssix",
 ]
+
 HELLO_TEXT = [
 	" Hi, I am Myssix - a generals.io bot",
 	" Say 'go' to start, or 'help' for a list of additional commands",

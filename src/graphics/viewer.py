@@ -8,8 +8,7 @@ import logging
 import pygame
 import threading
 import time
-
-from .client.constants import *
+from src.graphics.constants import *
 
 # Color Definitions
 BLACK = (0,0,0)
@@ -208,7 +207,7 @@ class GeneralsViewer(object):
 
 				pos_left = (CELL_MARGIN + CELL_WIDTH) * column + CELL_MARGIN
 				pos_top = (CELL_MARGIN + CELL_HEIGHT) * row + CELL_MARGIN + ABOVE_GRID_HEIGHT
-				if tile.isCity or tile.isGeneral: # City/General
+				if tile.is_city or tile.is_general: # City/General
 					# Draw Circle
 					pos_left_circle = int(pos_left + (CELL_WIDTH/2))
 					pos_top_circle = int(pos_top + (CELL_HEIGHT/2))
