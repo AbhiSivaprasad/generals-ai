@@ -24,7 +24,6 @@ class BoardGenerator:
         # place generals
         min_distance = math.ceil((2 / 3) * min(row, col))  # generals shouldn't be placed too close
 
-        p1_general_position, p2_general_position = None, None
         while True:
             p1_general_position = self._random_position(row, col)
             p2_general_position = self._random_position(row, col)
