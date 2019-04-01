@@ -32,7 +32,7 @@ class App extends Component {
     }
 
     componentDidMount() {
-        fetch(`/temp`)
+        fetch(`/replay`)
             .then(response => response.json())
             .then((data) => {
                 let boardStates;
