@@ -21,5 +21,8 @@ class DeepGeneral:
             dr = action - ((y * board.cols * 4) + x * 4)
             
             move = Move(x,y, x + directions[dr][0], y + directions[dr][1])
-    
-            return move
+            
+            if move in moves:
+                return move
+            else:
+                return random.choice(moves)
