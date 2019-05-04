@@ -31,9 +31,9 @@ class Board:
         assert(self.generals[0] is not None and self.generals[1] is not None)
 
         if self.generals[1].type == 0:    # player 0 captured player 1's general
-            return 1
-        elif self.generals[0].type == 1:  # player 1 captured player 0's general
             return 0
+        elif self.generals[0].type == 1:  # player 1 captured player 0's general
+            return 1
         else:
             return -1
 

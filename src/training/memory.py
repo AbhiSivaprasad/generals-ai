@@ -1,9 +1,12 @@
+import random
+
 class Memory:
     def __init__(self, max_memory):
         self._max_memory = max_memory
         self._samples = []
 
     def add_samples(self, samples):
+        random.shuffle(samples)
         for sample in samples:
             self.add_sample(sample)
 

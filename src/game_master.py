@@ -6,6 +6,7 @@ from src.graphics.board import Board
 from src.graphics.constants import TILE_EMPTY, TILE_FOG, TILE_MOUNTAIN, TILE_OBSTACLE, DIRECTIONS
 from src.graphics.tile import Tile
 from src.move import Move
+from src.training.model import convert_move, convert_board
 
 
 class GameMaster():
@@ -25,7 +26,7 @@ class GameMaster():
             # log initial board configuration
             self.logger.init(self.board, self.views)
 
-    def play(self):
+    def play(self, trainer=None):
         """
         conduct game between players on given board
         :return:
@@ -34,12 +35,27 @@ class GameMaster():
             print("turn: {}".format(self.turn))
             if self.board.terminal_status() != -1:
                 # game is over
-                return self.board.terminal_status()
+                winner = self.board.terminal_status()
+                ## NEW CODE
+                ## NEW CODE
+                # Tells trainer to calculate rewards and add to real memory
+                if (trainer != None):
+                    trainer.finalize_memory(winner)
+                ## END
+                return winner
 
             # each player outputs a move given their view
             moves = [player.move(view) if len(list(view.legal_moves)) > 0 else None
                      for player, view
                      in zip(self.players, self.views)]
+
+            ## NEW CODE
+            ## NEW CODE
+            # Creates the current states/actions to be passed to the trainer
+            if (trainer != None):
+                states = [convert_board(board) for board in views]
+                actions = [convert_move(move) for move in moves]
+            ## END
 
             for moving_player_index, move in list(enumerate(moves)):
                 if move is None or move not in self.views[moving_player_index].legal_moves:
@@ -103,6 +119,16 @@ class GameMaster():
                 # increment all troops for each view
                 for view in self.views:
                     self.tick(view)
+
+            ## NEW CODE
+            ## NEW CODE
+            if (trainer != None):
+                # Creates the next states after move has been taken
+                next_states = [convert_board(board) for board in views]
+                # Adds the SAS' to the temporary memory and trains for our player
+                for i in range(len(players)):
+                    trainer.step(states[i], actions[i], next_states[i], i, board.terminal_status() != -1)
+            ## END
 
             self.turn += 1
 

@@ -6,67 +6,72 @@ from src.graphics.board import Board
 from src.logger import Logger
 from src.players.deep_general import DeepGeneral
 
-
-for i in range(1):
-    bg = BoardGenerator()
-    board = bg.generate_board_state(15, 15)
-
-    print(board.serialize())
-
-    logger = Logger(num_players=2)
-
-    game_master = GameMaster(board, players=[RandomPlayer(), RandomPlayer()], logger=logger)
-    game_master.play()
-
-    with open("../../resources/replays/temp.txt", "w") as f:
-        f.write(json.dumps(logger.output()))
-
+import params
 
 class Trainer:
-    def __init__(self, sess, model, memory, max_eps, min_eps):
+    def __init__(self, sess, model, memory):
         self._sess = sess
         self._model = model
-        self._best_model = model
+
         self._memory = memory
-        self._max_eps = max_eps
-        self._min_eps = min_eps
-        self._eps = max_eps
+        self._temp_memory = None
+
+        self._eps = params.MAX_EPS
+        self._decay_step = 0
+
         self._bg = BoardGenerator()
+    
 
-    def run(self):
-        iterations_without_imp = 0
-        while True:
-            self._play_game_batch(50)
-            win_pct = self._play_game_batch(10, True)
-            # If wins more than 50% of games, should replace the best one
-            if (win_pct > 0.5):
-                self._best_player = self._player
-                iterations_without_imp = 0
-            else:
-                iterations_without_imp += 1
+    def step(self, state, action, next_state, player_id, terminal):
+        # Decay epsilon
+        self._decay_eps()
 
-            # If model can't beat best_model after certain amount of time, should stop training
-            if (iterations_without_imp > 20):
-                print("EARLY STOPPING")
-                break
+        # Create and add temporary SAS to memory, so we can add R later based on player_id
+        SAS = (state, action, player_id, next_state, terminal)
+        self._temp_memory.append(SAS)
 
-    def _play_game_batch(self, num_games, evaluate=False):
-        wins = 0
-        for i in range(num_games):
-            board = bg.generate_board_state(15, 15)
-            logger = Logger(num_players=2)
+        # Only want to train when we take a step with our player
+        # otherwise we're training twice as much as we'd want to
+        if (player_id != 0): return
 
-            p1 = DeepGeneral(self._model, self._eps)
-            p2 = DeepGeneral(self._best_model, self._eps)
-            game_master = GameMaster(board, players=[p1, p2], logger=logger)
-            game_master.play()
+        # Sample and train from actual memory
+        mini_batch = self._memory.sample(params.BATCH_SIZE)
+        states_mb = np.array([b[0] for b in mini_batch])
+        actions_mb = np.array([b[1] for b in mini_batch])
+        next_states_mb = np.array([b[3] for b in mini_batch])
 
-            if logger.winner() == 1:
-                wins += 1
-            if not evaluate:
-                SARS = logger.getSARS()
-                self._memory.add_samples(SARS)
-                self._replay()
-                
-        return wins/num_games
 
+        # Get Q values for next_state 
+        next_Q = self._model.predict_batch(next_states_mb, self._sess)
+
+        target_mb = [r if terminal else r + params.GAMMA * np.max(next_Q)
+            for (_, _, r, _, terminal), next_Q in zip(mini_batch, next_Q)]
+        
+        loss = self._model.train_batch(states_mb, targets_mb, actions_mb)
+
+        if (terminal):
+            print("Loss: " + str(loss))
+            print("Episode Finished")
+            print()
+
+
+    def gen_game(self, episode_number):
+        print("Starting Episode " + str(episode_number) + "...")
+        self._temp_memory = []
+        board = bg.generate_board_state(params.BOARD_WIDTH, params.BOARD_HEIGHT)
+        logger = Logger(num_players=2)
+
+        p1 = DeepGeneral(self._model, self._eps)
+        p2 = DeepGeneral(self._model, self._eps)
+        return GameMaster(board, players=[p1, p2], logger=logger)
+
+    def convert_temp_memory(self, winner):
+        SARS = [(state, action, 1, next_state, t) if winner == player_id
+            else (state, action, -1, next_state, t)
+            for (state, action, player_id, next_state, t) in self._temp_memory]
+        self._memory.add_samples(SARS)
+
+    def _decay_eps(self):
+        self._eps = params.MIN_EPS + 
+            (params.MAX_EPS - params.MIN_EPS) * np.exp(-params.DECAY_RATE * self._decay_step)
+        self._decay_step += 1
