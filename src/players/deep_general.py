@@ -16,9 +16,9 @@ class DeepGeneral:
         else:
             action = np.argmax(self._model.predict_one(state, self._sess))
             
-            y = action // (self.board_width * 4)
-            x = (action - (y * self.board_width * 4)) // 4
-            dr = action - ((y * self.board_width * 4) + x * 4)
+            y = action // (board.cols * 4)
+            x = (action - (y * board.cols * 4)) // 4
+            dr = action - ((y * board.cols * 4) + x * 4)
             
             move = Move(x,y, x + directions[dr][0], y + directions[dr][1])
     
