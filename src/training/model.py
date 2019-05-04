@@ -107,17 +107,26 @@ def convert_board(board):
             output[i,j,:] = temp
     
     return state
-       
-def convert_action(action):
+
+def convert_move(move):
     
     directions = [(1,0), (0,1), (-1,0), (0,-1)]
+   
+    dx = move.destx - move.startx
+    dy = move.desty - move.starty
     
-    y = action // (self.board_width * 4)
+    action = move.starty * self.board_width * 4 + move.startx * 4
     
-    x = (action - (y * self.board_width * 4)) // 4
+    if dx == 0:
+        if dy == 1:
+            action += 1
+        else:
+            action += 3
+    elif dx == -1:
+        action += 2
     
-    dr = action - ((y * self.board_width * 4) + x * 4)
+    return action
+        
     
-    move = Move(x,y, x + directions[dr][0], y + directions[dr][1])
     
-    return move
+    
