@@ -95,8 +95,8 @@ def convert_board(board):
             # the temporary storage for a tile
             temp = np.zeros(8)
 
-            temp[0] = int(tile.type == TILE_OBSTACLE && !tile.is_city && !tile.is_mountain)
-            temp[1] = int(tile.type != TILE_OBSTACLE && tile.type != TILE_FOG)
+            temp[0] = int(tile.type == TILE_OBSTACLE and not tile.is_city and not tile.is_mountain)
+            temp[1] = int(tile.type != TILE_OBSTACLE and tile.type != TILE_FOG)
             temp[2] = int(tile.is_city)
             temp[3] = int(tile.is_mountain)
             temp[4] = int(tile.is_general)
