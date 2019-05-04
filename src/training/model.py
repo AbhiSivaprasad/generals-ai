@@ -77,13 +77,39 @@ class Model:
         return loss
 
 def convert_board(board):
+    
+    state = np.zeros(self._board_width, self._board_width, params.INPUT_DEPTH)
+    
     # If it's a terminal state we dont want that shit
     if (next_board.terminal_status() != -1):
-        return np.zeros(self._board_width, self._board_width, params.INPUT_DEPTH)
-    # TODO
-    state = None
+        return state
+    
+    our_player = board.player_index
+    opponent = 1 - our_player
+    
+    for i in range(board.rows):
+        for j in range(board.cols):
+            
+            tile = board.grid[i][j]
+      
+            # the temporary storage for a tile
+            temp = np.zeros(8)
+
+            temp[0] = int(tile.type == TILE_OBSTACLE && !tile.is_city && !tile.is_mountain)
+            temp[1] = int(tile.type != TILE_OBSTACLE && tile.type != TILE_FOG)
+            temp[2] = int(tile.is_city)
+            temp[3] = int(tile.is_mountain)
+            temp[4] = int(tile.is_general)
+            temp[5] = int(tile.type == opponent)
+            temp[6] = int(tile.type == our_player)
+            temp[7] = tile.army
+
+            output[i,j,:] = temp
+    
     return state
+       
 def convert_move(move):
+    
     # TODO
     action = None
     return action
