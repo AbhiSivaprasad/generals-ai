@@ -44,7 +44,7 @@ class Trainer:
         # Get Q values for next_state 
         next_Q = self._model.predict_batch(next_states_mb, self._sess)
 
-        target_mb = [r if terminal else r + params.GAMMA * np.max(next_Q)
+        target_mb = [r if terminal else r + params.GAMMA * np.amax(next_Q, axis=1)
             for (_, _, r, _, terminal), next_Q in zip(mini_batch, next_Q)]
         
         loss = self._model.train_batch(states_mb, targets_mb, actions_mb)
