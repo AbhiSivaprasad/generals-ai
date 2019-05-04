@@ -40,7 +40,7 @@ class GameMaster():
                 ## NEW CODE
                 # Tells trainer to calculate rewards and add to real memory
                 if (trainer != None):
-                    trainer.finalize_memory(winner)
+                    trainer.convert_temp_memory(winner)
                 ## END
                 return winner
 
