@@ -23,9 +23,6 @@ class Trainer:
     
 
     def step(self, state, action, next_state, player_id, terminal):
-        # Decay epsilon
-        self._decay_eps()
-
         # Create and add temporary SAS to memory, so we can add R later based on player_id
         SAS = (state, action, player_id, next_state, terminal)
         self._temp_memory.append(SAS)
@@ -33,19 +30,28 @@ class Trainer:
         # Only want to train when we take a step with our player
         # otherwise we're training twice as much as we'd want to
         if (player_id != 0): return
+        # Don't want to train until we have enough examples
+        if (self._memory.low_size()):
+            if (terminal):
+                print("Still filling memory...")
+                print("Episode Finished")
+                print()
+            return
 
+        # Decay epsilon
+        self._decay_eps()
+        self._update(terminal)
+
+    def _update(self, terminal):
         # Sample and train from actual memory
-        mini_batch = self._memory.sample(params.BATCH_SIZE)
-        states_mb = np.array([b[0] for b in mini_batch])
-        actions_mb = np.array([b[1] for b in mini_batch])
-        next_states_mb = np.array([b[3] for b in mini_batch])
-
+        samples = self._memory.sample(params.BATCH_SIZE)
+        states_mb, actions_mb, rewards_mb, next_states_mb, terminal_mb = map(np.array, zip(*samples))
 
         # Get Q values for next_state 
-        next_Q = self._model.predict_batch(next_states_mb, self._sess)
-
-        target_mb = [r if terminal else r + params.GAMMA * np.amax(next_Q, axis=1)
-            for (_, _, r, _, terminal), next_Q in zip(mini_batch, next_Q)]
+        max_next_state_Qs = np.amax(self._model.predict_batch(next_states_mb, self._sess), axis=1)
+        # We invert the terminal so that if it IS terminal, then we're multiply by 0
+        # Since if the next_state is a terminal state, the target is just the reward
+        targets_mb = rewards_mb + (1. - terminal_mb) * params.GAMMA * max_next_state_Qs
         
         loss = self._model.train_batch(states_mb, targets_mb, actions_mb)
 

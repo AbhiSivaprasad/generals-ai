@@ -1,9 +1,13 @@
 import random
+import params
 
 class Memory:
     def __init__(self, max_memory):
         self._max_memory = max_memory
         self._samples = []
+
+    def low_size(self):
+        return len(self._samples) < params.MIN_MEMORY
 
     def add_samples(self, samples):
         random.shuffle(samples)
@@ -16,4 +20,4 @@ class Memory:
             self._samples.pop(0)
 
     def sample(self, no_samples):
-        return random.sample(self._samples, min(no_samples, len(self._samples))
+        return random.sample(self._samples, min(no_samples, len(self._samples)))

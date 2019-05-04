@@ -38,12 +38,40 @@ class Model:
         self._actions = tf.placeholder(tf.float32, [None, self._num_actions], name="actions", dtype=tf.float32)
         self._target_Q = tf.placeholder(shape=[None], name="target_Q", dtype=tf.float32)
 
+        # Add convolutional layers
         current_input = self._states
         for i in range(params.NUM_CONV_LAYERS):
             current_input = self._add_conv_layer(current_input, filters=64, kernal_size=3, i)
         conv_output = self._add_conv_layer(current_input, filters=2, kernal_size=1, params.NUM_CONV_LAYERS+1)
 
+        # Add fully connected layers
         flattened_output = tf.layers.flatten(conv_output)
+
+        # # Dueling DQN
+        # value_fc = tf.layers.dense(flattened_output,
+        #     units = 512,
+        #     activation = tf.nn.relu,
+        #     kernel_initializer=tf.contrib.layers.variance_scaling_initializer(),
+        #     name="value_fc")
+        # value = tf.layers.dense(value_fc,
+        #     units = 1,
+        #     activation = None,
+        #     kernel_initializer=tf.contrib.layers.variance_scaling_initializer(),
+        #     name="value")
+        
+        # advantage_fc = tf.layers.dense(flattened_output,
+        #     units = 512,
+        #     activation = tf.nn.relu,
+        #     kernel_initializer=tf.contrib.layers.variance_scaling_initializer(),
+        #     name="advantage_fc")
+        # advantage = tf.layers.dense(advantage_fc,
+        #     units = self._num_actions,
+        #     activation = None,
+        #     kernel_initializer=tf.contrib.layers.variance_scaling_initializer(),
+        #     name="advantages")
+
+        # self._output = value + tf.subtract(advantage, tf.reduce_mean(advantage, axis=1, keepdims=True))
+        
         fc1 = tf.layers.dense(flattened_output,
             units = 512,
             activation = tf.nn.relu,
@@ -51,12 +79,13 @@ class Model:
             name="fc1")
 
         self._output = tf.layers.dense(fc1,
-            kernel_initializer=tf.contrib.layers.variance_scaling_initializer(),
             units = self._num_actions,
-            activation=None)
+            activation=None
+            kernel_initializer=tf.contrib.layers.variance_scaling_initializer(),
+            name="output")
 
         # Mask the output to only the Q value of the action taken
-        pred_Q = tf.reduce_sum(tf.multiply(self.output, self._actions), axis=1)
+        pred_Q = tf.reduce_sum(tf.multiply(self._output, self._actions), axis=1)
 
         self._loss = tf.reduce_mean(tf.square(self.target_Q - pred_Q))
         self._optimizer = tf.train.AdamOptimizer().minimize(loss)
@@ -77,10 +106,8 @@ class Model:
         return loss
 
 def convert_board(board):
-    
-    state = np.zeros(self._board_width, self._board_width, params.INPUT_DEPTH)
-    
-    # If it's a terminal state we dont want that shit
+    state = np.zeros(params.BOARD_WIDTH, params.BOARD_HEIGHT, params.INPUT_DEPTH)
+    # If it's a terminal state we dont want that
     if (next_board.terminal_status() != -1):
         return state
     
@@ -89,7 +116,6 @@ def convert_board(board):
     
     for i in range(board.rows):
         for j in range(board.cols):
-            
             tile = board.grid[i][j]
       
             # the temporary storage for a tile
@@ -109,14 +135,11 @@ def convert_board(board):
     return state
 
 def convert_move(move):
-    
-    directions = [(1,0), (0,1), (-1,0), (0,-1)]
-   
+    # directions = [(1,0), (0,1), (-1,0), (0,-1)]
     dx = move.destx - move.startx
     dy = move.desty - move.starty
     
-    action = move.starty * self.board_width * 4 + move.startx * 4
-    
+    action = move.starty * params.BOARD_WIDTH * 4 + move.startx * 4
     if dx == 0:
         if dy == 1:
             action += 1
@@ -126,7 +149,3 @@ def convert_move(move):
         action += 2
     
     return action
-        
-    
-    
-    
