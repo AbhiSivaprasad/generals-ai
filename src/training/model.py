@@ -106,7 +106,9 @@ class Model:
         return loss
 
 def convert_board(board):
+    
     state = np.zeros(params.BOARD_WIDTH, params.BOARD_HEIGHT, params.INPUT_DEPTH)
+    
     # If it's a terminal state we dont want that
     if (next_board.terminal_status() != -1):
         return state
