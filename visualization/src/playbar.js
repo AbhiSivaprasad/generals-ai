@@ -36,6 +36,8 @@ class PlayBar extends Component {
                     <button onClick={this.props.onAutoPlaySpeedClickFactory(5)}>5x</button>
                     <button onClick={this.props.onAutoPlaySpeedClickFactory(10)}>10x</button>
                     <button onClick={this.props.onAutoPlaySpeedClickFactory(50)}>50x</button>
+                    <button onClick={this.props.onAutoPlaySpeedClickFactory(100)}>100x</button>
+                    <button onClick={this.props.onAutoPlaySpeedClickFactory(250)}>250x</button>
                 </div>
             </div>
         )

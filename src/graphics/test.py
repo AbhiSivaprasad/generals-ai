@@ -1,3 +1,6 @@
+import sys
+sys.path.insert(0, '../../')
+
 import json
 
 from src.board_generator import BoardGenerator
@@ -9,7 +12,7 @@ from src.players.random_player import RandomPlayer
 
 for i in range(1):
     bg = BoardGenerator()
-    board = bg.generate_board_state(15, 15)
+    board = bg.generate_board_state(18, 18)
 
     print(board.serialize())
 
@@ -18,5 +21,5 @@ for i in range(1):
     game_master = GameMaster(board, players=[RandomPlayer(), RandomPlayer()], logger=logger)
     game_master.play()
 
-    with open("../../resources/replays/temp.txt", "w") as f:
+    with open("../../resources/replays/temp2.txt", "w") as f:
         f.write(json.dumps(logger.output()))

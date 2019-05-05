@@ -17,8 +17,8 @@ class Tile(object):
         self.turn_captured = 0    # Integer Turn Tile Last Captured
         self.turn_held = 0        # Integer Last Turn Held
         self.army = 0             # Integer Army Count
-        self.is_city = False      # Boolean is_city
-        self.is_general = False   # Boolean is_general
+        self.is_city = False      # Boolean is tile city
+        self.is_general = False   # Boolean is tile general
 
         # Private Properties
         self._board = board       # Pointer to Board Object
