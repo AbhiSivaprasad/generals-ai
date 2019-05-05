@@ -91,7 +91,7 @@ class Model:
         # Mask the output to only the Q value of the action taken
         pred_Q = tf.reduce_sum(tf.multiply(self._output, self._actions), axis=1)
 
-        self._loss = tf.reduce_mean(tf.square(self.target_Q - pred_Q))
+        self._loss = tf.reduce_mean(tf.square(self._target_Q - pred_Q))
         self._optimizer = tf.train.AdamOptimizer().minimize(loss)
         self.var_init = tf.global_variables_initializer()
 
