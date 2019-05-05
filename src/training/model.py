@@ -128,7 +128,7 @@ def convert_board(board):
             temp[6] = int(tile.type == our_player)
             temp[7] = tile.army
 
-            output[i,j,:] = temp
+            state[i,j,:] = temp
     
     return state
 
