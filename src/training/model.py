@@ -130,7 +130,7 @@ def convert_board(board):
             temp[2] = int(tile.is_city)
             temp[3] = int(tile.type == TILE_MOUNTAIN)
             temp[4] = int(tile.is_general)
-            temp[5] = int(tile.type == opponent)
+            temp[5] = int(tile.type == opponent or tile.memory != -1)
             temp[6] = int(tile.type == our_player)
             temp[7] = tile.army
 
