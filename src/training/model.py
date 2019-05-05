@@ -96,7 +96,7 @@ class Model:
 
     def predict_one(self, state, sess):
         states = state.reshape(1, self._board_width, self._board_height, params.INPUT_DEPTH)
-        return self.predict_batch(state, sess)
+        return self.predict_batch(states, sess)
 
     def predict_batch(self, states, sess):
         return sess.run(self._output, feed_dict={ self._input_states: states })
