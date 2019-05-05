@@ -38,7 +38,7 @@ class Model:
     def _create_model(self):
         self._input_states = tf.placeholder(shape=[None, self._board_width, self._board_height, params.INPUT_DEPTH],
             name="input_state", dtype=tf.float32)
-        self._actions = tf.placeholder(tf.float32, [None, self._num_actions], name="actions", dtype=tf.float32)
+        self._actions = tf.placeholder(shape = [None, self._num_actions], name="actions", dtype=tf.float32)
         self._target_Q = tf.placeholder(shape=[None], name="target_Q", dtype=tf.float32)
 
         # Add convolutional layers
