@@ -20,6 +20,7 @@ class Model:
         self._loss = None
         self._optimizer = None
         self.var_init = None
+        self.is_training = False
 
         self._create_model()
 
@@ -102,10 +103,12 @@ class Model:
         return sess.run(self._output, feed_dict={ self._input_states: states })
 
     def train_batch(self, x_batch, y_batch, action_batch, sess):
+        self.is_training = True
         loss, _ = sess.run([self._loss, self._optimizer],
             feed_dict={ self._input_states: x_batch,
                         self._actions: action_batch,
                         self._target_Q: y_batch })
+        self.is_training = False
         return loss
 
 def convert_board(board):
