@@ -3,7 +3,7 @@ app = Flask(__name__)
 
 @app.route('/replay')
 def replay():
-    with open('../resources/replays/temp.txt', 'r') as file:
+    with open('../resources/replays/temp2.txt', 'r') as file:
         return file.read()
 
 if __name__ == '__main__':

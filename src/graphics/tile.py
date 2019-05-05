@@ -17,8 +17,11 @@ class Tile(object):
         self.turn_captured = 0    # Integer Turn Tile Last Captured
         self.turn_held = 0        # Integer Last Turn Held
         self.army = 0             # Integer Army Count
-        self.is_city = False      # Boolean is_city
-        self.is_general = False   # Boolean is_general
+        self.is_city = False      # Boolean is tile city
+        self.is_general = False   # Boolean is tile general
+        self.memory = -1          # Player Index of last known opponent to control tile 
+                                  # if has vision of tile then -1 (no need to consult memory if has direct vision)
+                                  # if has never seen tile then -1 (no knowledge)
 
         # Private Properties
         self._board = board       # Pointer to Board Object
@@ -37,7 +40,8 @@ class Tile(object):
             'type': self.type,
             'army': self.army,
             'isCity': self.is_city,
-            'isGeneral': self.is_general
+            'isGeneral': self.is_general,
+            'memory' : self.memory 
         }
 
     def set_neighbors(self, board):

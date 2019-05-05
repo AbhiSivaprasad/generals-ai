@@ -159,15 +159,18 @@ class GameMaster():
         """
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:
-                if dx == dy == 0:
-                    continue
-
                 if not (0 <= tile.y + dy <= view.rows - 1 and 0 <= tile.x + dx <= view.cols - 1):
                     # out of bounds of grid
                     continue
 
                 game_tile = self.board.grid[tile.y + dy][tile.x + dx]
                 view_tile = view.grid[tile.y + dy][tile.x + dx]
+
+                # no need to mark tile as "remembered opponent is here" since now have direct vision
+                view_tile.memory = -1  
+
+                if dx == dy == 0:
+                    continue
 
                 if view_tile.type == TILE_OBSTACLE or view_tile.type == TILE_FOG:
                     # currently have no vision of tile so copy game tile into view tile
@@ -188,9 +191,6 @@ class GameMaster():
 
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:
-                if dx == dy == 0:
-                    continue
-
                 if not (0 <= tile.y + dy <= view.rows - 1 and 0 <= tile.x + dx <= view.cols - 1):
                     # out of bounds of grid
                     continue
@@ -198,10 +198,13 @@ class GameMaster():
                 view_tile = view.grid[tile.y + dy][tile.x + dx]
                 view_tile_type = view_tile.type
                 if not self._has_vision(view, view_tile):
+                    if view_tile.type >= 0:
+                        # retain memory that opponent is there
+                        view_tile.memory = view_tile.type
+
                     # turn tile into a fog tile
                     if view_tile.type >= 0 or (view_tile.type == TILE_EMPTY and not view_tile.is_city):
                         view_tile.type = TILE_FOG
-                        view_tile.army = 0
                     elif view_tile.type == TILE_EMPTY and view_tile.is_city:
                         view_tile.type = TILE_OBSTACLE
 
