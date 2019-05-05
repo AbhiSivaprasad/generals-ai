@@ -42,7 +42,7 @@ class Model:
         self._target_Q = tf.placeholder(shape=[None], name="target_Q", dtype=tf.float32)
 
         # Add convolutional layers
-        current_input = self._states
+        current_input = self._input_states
         for i in range(params.NUM_CONV_LAYERS):
             current_input = self._add_conv_layer(current_input, 64, 3, i)
         conv_output = self._add_conv_layer(current_input, 2, 1, params.NUM_CONV_LAYERS+1)
