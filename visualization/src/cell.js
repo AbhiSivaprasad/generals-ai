@@ -20,6 +20,7 @@ class Cell extends Component {
         };
 
         const playerColors = ["blue", "red"];
+        const playerMemoryColors = ["#1a114f", "#4f0721"];
         switch (this.props.data.type) {
             case -4:
             case -3:
@@ -38,6 +39,11 @@ class Cell extends Component {
             default:
                 // player index
                 cellStyle["backgroundColor"] = playerColors[this.props.data.type];
+        }
+
+        if(this.props.data.hasOwnProperty("memory") && this.props.data.memory !== -1) {
+            // this is a cell which is fogged but "remembered"
+            cellStyle["backgroundColor"] = playerMemoryColors[this.props.data.memory]
         }
 
         // set background image for cell

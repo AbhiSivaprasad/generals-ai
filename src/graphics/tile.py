@@ -19,6 +19,9 @@ class Tile(object):
         self.army = 0             # Integer Army Count
         self.is_city = False      # Boolean is tile city
         self.is_general = False   # Boolean is tile general
+        self.memory = -1          # Player Index of last known opponent to control tile 
+                                  # if has vision of tile then -1 (no need to consult memory if has direct vision)
+                                  # if has never seen tile then -1 (no knowledge)
 
         # Private Properties
         self._board = board       # Pointer to Board Object
@@ -37,7 +40,8 @@ class Tile(object):
             'type': self.type,
             'army': self.army,
             'isCity': self.is_city,
-            'isGeneral': self.is_general
+            'isGeneral': self.is_general,
+            'memory' : self.memory 
         }
 
     def set_neighbors(self, board):

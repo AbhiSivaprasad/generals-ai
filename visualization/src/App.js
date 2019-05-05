@@ -116,6 +116,7 @@ class App extends Component {
             updateCell.type = diff.type;
             updateCell.isCity = diff.isCity;
             updateCell.isGeneral = diff.isGeneral;
+            updateCell.memory = diff.memory;
         }
     }
 
