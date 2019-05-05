@@ -78,6 +78,6 @@ class Trainer:
         self._memory.add_samples(SARS)
 
     def _decay_eps(self):
-        self._eps = params.MIN_EPS + 
+        self._eps = params.MIN_EPS + \
             (params.MAX_EPS - params.MIN_EPS) * np.exp(-params.DECAY_RATE * self._decay_step)
         self._decay_step += 1
