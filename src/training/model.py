@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import params
-from src.graphics.constants import *
+from ..graphics.constants import *
 
 class Model:
     def __init__(self, bw=None, bh=None):
