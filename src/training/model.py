@@ -149,4 +149,4 @@ def convert_move(move):
     elif dx == -1:
         action += 1
     
-    return action
+    return tf.one_hot(action, params.BOARD_WIDTH * params.BOARD_HEIGHT * 4)
