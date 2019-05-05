@@ -29,7 +29,7 @@ class Model:
         conv = tf.layers.conv2d(input_tensor,
             filters=filters,
             kernel_size=kernal_size,
-            kernal_initializer=tf.contrib.layers.variance_scaling_initializer(),
+            kernel_initializer=tf.contrib.layers.variance_scaling_initializer(),
             padding="VALID",
             name="conv" + str(i+1))
         norm = tf.layers.batch_normalization(conv, training=self.is_training, name="norm" + str(i+1))
