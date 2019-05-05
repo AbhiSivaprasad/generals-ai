@@ -1,7 +1,10 @@
+import sys
+sys.path.insert(0, "../../")
+
 import tensorflow as tf
 import numpy as np
 import params
-from ..graphics.constants import *
+from src.graphics.constants import *
 
 class Model:
     def __init__(self, bw=None, bh=None):
