@@ -64,7 +64,7 @@ class Trainer:
     def gen_game(self, episode_number):
         print("Starting Episode " + str(episode_number) + "...")
         self._temp_memory = []
-        board = bg.generate_board_state(params.BOARD_WIDTH, params.BOARD_HEIGHT)
+        board = self._bg.generate_board_state(params.BOARD_WIDTH, params.BOARD_HEIGHT)
         logger = Logger(num_players=2)
 
         p1 = DeepGeneral(self._model, self._eps)
