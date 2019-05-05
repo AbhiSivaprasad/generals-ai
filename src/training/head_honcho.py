@@ -4,20 +4,22 @@ from model import Model
 from trainer import Trainer
 import params
 
+# Create the model object and saver
+model = Model(params.BOARD_WIDTH, params.BOARD_HEIGHT)
 saver = tf.train.Saver()
 
 with tf.Session() as sess:
+
     # Create the memory
     memory = Memory(params.MEMORY_SIZE)
 
-    # Create the model object and initialize the model parameters
-    model = Model(params.BOARD_WIDTH, params.BOARD_HEIGHT)
-    model.var_init.eval()
+    # Initialize the model parameters
+    sess.run(model.var_init)
 
     # Initialize the trainer
     trainer = Trainer(sess, model, memory)
 
-    for episode in range(NUM_EPISODES):
+    for episode in range(params.NUM_EPISODES):
         gm = trainer.gen_game(episode)
         gm.play(trainer)
 
