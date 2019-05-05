@@ -80,8 +80,8 @@ class Model:
 
         self._output = tf.layers.dense(fc1,
             units = self._num_actions,
-            activation=None
-            kernel_initializer=tf.contrib.layers.variance_scaling_initializer(),
+            activation=None,
+            kernel_initializer = tf.contrib.layers.variance_scaling_initializer(),
             name="output")
 
         # Mask the output to only the Q value of the action taken
