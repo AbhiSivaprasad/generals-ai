@@ -92,7 +92,7 @@ class Model:
         pred_Q = tf.reduce_sum(tf.multiply(self._output, self._actions), axis=1)
 
         self._loss = tf.reduce_mean(tf.square(self._target_Q - pred_Q))
-        self._optimizer = tf.train.AdamOptimizer().minimize(loss)
+        self._optimizer = tf.train.AdamOptimizer().minimize(self._loss)
         self.var_init = tf.global_variables_initializer()
 
     def predict_one(self, state, sess):
