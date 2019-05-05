@@ -122,7 +122,7 @@ def convert_board(board):
             temp[0] = int(tile.type == TILE_OBSTACLE and not tile.is_city)
             temp[1] = int(tile.type != TILE_OBSTACLE and tile.type != TILE_FOG)
             temp[2] = int(tile.is_city)
-            temp[3] = int(tile.is_mountain)
+            temp[3] = int(tile.type == TILE_MOUNTAIN)
             temp[4] = int(tile.is_general)
             temp[5] = int(tile.type == opponent)
             temp[6] = int(tile.type == our_player)
