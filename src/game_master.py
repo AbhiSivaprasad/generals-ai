@@ -19,6 +19,7 @@ class GameMaster():
         self.logger = logger
         self.players = players
         self.turn = 0
+        self.no_action = False
         self.views = [self.create_board_view(0),
                       self.create_board_view(1)]
 
@@ -32,6 +33,9 @@ class GameMaster():
         :return:
         """
         while True:
+            
+            self.no_action = False
+
             print("turn: {}".format(self.turn))
             if self.board.terminal_status() != -1:
                 # game is over
@@ -48,11 +52,14 @@ class GameMaster():
             moves = [player.move(view) if len(list(view.legal_moves)) > 0 else None
                      for player, view
                      in zip(self.players, self.views)]
+            
+            if (moves[0] is None or moves[1] is None):
+                self.no_action = True
 
             ## NEW CODE
             ## NEW CODE
             # Creates the current states/actions to be passed to the trainer
-            if (trainer != None):
+            if (trainer != None and not self.no_action):
                 states = [convert_board(board) for board in views]
                 actions = [convert_move(move) for move in moves]
             ## END
@@ -122,11 +129,11 @@ class GameMaster():
 
             ## NEW CODE
             ## NEW CODE
-            if (trainer != None):
+            if (trainer != None and not self.no_action):
                 # Creates the next states after move has been taken
-                next_states = [convert_board(board) for board in views]
+                next_states = [convert_board(view) for view in views]
                 # Adds the SAS' to the temporary memory and trains for our player
-                for i in range(len(players)):
+                for i in range(len(self.players)):
                     trainer.step(states[i], actions[i], next_states[i], i, board.terminal_status() != -1)
             ## END
 
