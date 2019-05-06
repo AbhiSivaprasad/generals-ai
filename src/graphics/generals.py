@@ -20,8 +20,6 @@ _RESULTS = {
 
 
 class Generals(object):
-
-    # region is deprecated
     def __init__(self, userid, username=None, mode="1v1", gameid=None,
                  force_start=True, region=None):
 
