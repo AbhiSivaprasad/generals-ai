@@ -22,23 +22,25 @@ class BoardGenerator:
         city_probability = rand.random() * 0.02 + 0.05     # random choice in interval [0.07, 0.09]
 
         # place generals
-        min_distance = math.ceil((2 / 3) * min(row, col))  # generals shouldn't be placed too close
-
-        while True:
-            p1_general_position = self._random_position(row, col)
-            p2_general_position = self._random_position(row, col)
-
-            if self._get_distance(p1_general_position, p2_general_position) >= min_distance:
-                break
+        min_distance = math.ceil((2.0 / 3) * min(row, col))  # generals shouldn't be placed too close
 
         # generate random boards until one is valid
         board = Board(rows=row, cols=col, player_index=None)
-        grid = [  # 2D List of Tile Objects
-            [Tile(self, x, y) for x in range(col)]
-            for y in range(row)
-        ]
+        
 
         while True:
+            while True:
+                p1_general_position = self._random_position(row, col)
+                p2_general_position = self._random_position(row, col)
+
+                if self._get_distance(p1_general_position, p2_general_position) >= min_distance:
+                    break
+
+            grid = [  # 2D List of Tile Objects
+                [Tile(self, x, y) for x in range(col)]
+                for y in range(row)
+            ]
+
             # place terrain
             for x in range(row):
                 for y in range(col):
@@ -76,12 +78,6 @@ class BoardGenerator:
             if board.generals[0].path_to(board.generals[1]):
                 # path between generals exists so map is valid
                 break
-
-            # grid was not valid so reset
-            grid = [
-                [Tile(self, x, y) for x in range(col)]
-                for y in range(row)
-            ]
 
         return board
 

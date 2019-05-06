@@ -1,5 +1,5 @@
 import json
-
+import numpy as np
 from src.board_generator import BoardGenerator
 from src.game_master import GameMaster
 from src.graphics.board import Board
@@ -35,7 +35,6 @@ class Trainer:
             if (terminal):
                 print("Still filling memory...")
                 print("Episode Finished")
-                print()
             return
 
         # Decay epsilon
@@ -52,23 +51,28 @@ class Trainer:
         # We invert the terminal so that if it IS terminal, then we're multiply by 0
         # Since if the next_state is a terminal state, the target is just the reward
         targets_mb = rewards_mb + (1. - terminal_mb) * params.GAMMA * max_next_state_Qs
-        
-        loss = self._model.train_batch(states_mb, targets_mb, actions_mb)
+
+        loss = self._model.train_batch(states_mb, targets_mb, actions_mb, self._sess)
 
         if (terminal):
             print("Loss: " + str(loss))
             print("Episode Finished")
-            print()
 
 
     def gen_game(self, episode_number):
         print("Starting Episode " + str(episode_number) + "...")
         self._temp_memory = []
         board = self._bg.generate_board_state(params.BOARD_WIDTH, params.BOARD_HEIGHT)
+
+        #print "flag1"
+
         logger = Logger(num_players=2)
 
-        p1 = DeepGeneral(self._model, self._eps)
-        p2 = DeepGeneral(self._model, self._eps)
+        p1 = DeepGeneral(self._model, self._eps, self._sess)
+        p2 = DeepGeneral(self._model, self._eps, self._sess)
+
+        #print "flag2"
+
         return GameMaster(board, players=[p1, p2], logger=logger)
 
     def convert_temp_memory(self, winner):

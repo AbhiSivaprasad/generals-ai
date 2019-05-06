@@ -36,7 +36,7 @@ class GameMaster():
             
             self.no_action = False
 
-            print("turn: {}".format(self.turn))
+            #print("turn: {}".format(self.turn))
             if self.board.terminal_status() != -1:
                 # game is over
                 winner = self.board.terminal_status()

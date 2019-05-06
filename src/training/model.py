@@ -45,7 +45,7 @@ class Model:
         # Add convolutional layers
         current_input = self._input_states
         for i in range(params.NUM_CONV_LAYERS):
-            current_input = self._add_conv_layer(current_input, 64, 3, i)
+            current_input = self._add_conv_layer(current_input, 32, 3, i)
         conv_output = self._add_conv_layer(current_input, 2, 1, params.NUM_CONV_LAYERS+1)
 
         # Add fully connected layers
@@ -77,7 +77,7 @@ class Model:
         # self._output = value + tf.subtract(advantage, tf.reduce_mean(advantage, axis=1, keepdims=True))
         
         fc1 = tf.layers.dense(flattened_output,
-            units = 512,
+            units = 128,
             activation = tf.nn.relu,
             kernel_initializer=tf.contrib.layers.variance_scaling_initializer(),
             name="fc1")
@@ -91,8 +91,11 @@ class Model:
         # Mask the output to only the Q value of the action taken
         pred_Q = tf.reduce_sum(tf.multiply(self._output, self._actions), axis=1)
 
-        self._loss = tf.reduce_mean(tf.square(self._target_Q - pred_Q))
-        self._optimizer = tf.train.AdamOptimizer().minimize(self._loss)
+        #self._loss = tf.reduce_mean(tf.square(self._target_Q - pred_Q))
+        #self._loss = tf.losses.mean_squared_error(self._target_Q, pred_Q)
+        #self._loss = tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(self._target_Q, pred_Q))))
+        self._loss = tf.losses.huber_loss(self._target_Q, pred_Q)
+        self._optimizer = tf.train.RMSPropOptimizer(learning_rate=0.00025, decay=0.95, epsilon=0.01).minimize(self._loss)
         self.var_init = tf.global_variables_initializer()
 
     def predict_one(self, state, sess):
@@ -103,6 +106,7 @@ class Model:
         return sess.run(self._output, feed_dict={ self._input_states: states })
 
     def train_batch(self, x_batch, y_batch, action_batch, sess):
+
         self.is_training = True
         loss, _ = sess.run([self._loss, self._optimizer],
             feed_dict={ self._input_states: x_batch,
@@ -152,4 +156,8 @@ def convert_move(move):
     elif dx == -1:
         action += 1
     
-    return tf.one_hot(action, params.BOARD_WIDTH * params.BOARD_HEIGHT * 4)
+    return one_hot(action, params.BOARD_WIDTH * params.BOARD_HEIGHT * 4)
+
+
+def one_hot(a, num_classes):
+  return np.squeeze(np.eye(num_classes)[a])

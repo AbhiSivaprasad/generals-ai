@@ -1,11 +1,19 @@
 import random
 import tensorflow as tf
+import numpy as np
 from src.graphics.constants import *
+from src.training.model import *
 
 
 class DeepGeneral:
-    def __init__(self, model, eps=0):
+    def __init__(self, model, sess, eps=0):
         self._eps = eps
+        self._model = model
+        self._sess = sess
+
+        # metrics
+        self.legal_moves = 0
+        self.illegal_moves = 0
 
     def move(self, board):
         
@@ -20,13 +28,16 @@ class DeepGeneral:
         else:
             
             # get the predicted action
-            action = np.argmax(self._model.predict_one(state, self._sess))
+            action = np.argmax(self._model.predict_one(convert_board(board), self._sess))
            
             move = self.convert_action(action)
-            
+
             if move in moves:
+                self.legal_moves += 1
                 return move
             else:
+                print "illegal move"
+                self.illegal_moves += 1
                 return random.choice(moves)
     
     def convert_action(action):

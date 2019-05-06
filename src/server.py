@@ -1,9 +1,9 @@
-from flask import Flask
+from flask import Flask, request
 app = Flask(__name__)
 
 @app.route('/replay')
 def replay():
-    with open('../resources/replays/temp2.txt', 'r') as file:
+    with open('../resources/replays/{}.txt'.format(6300), 'r') as file:
         return file.read()
 
 if __name__ == '__main__':
