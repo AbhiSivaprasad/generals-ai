@@ -3,6 +3,7 @@ from memory import Memory
 from model import Model
 from trainer import Trainer
 import params
+import json
 
 # Create the model object and saver
 model = Model(params.BOARD_WIDTH, params.BOARD_HEIGHT)
@@ -20,8 +21,12 @@ with tf.Session() as sess:
     trainer = Trainer(sess, model, memory)
 
     for episode in range(params.NUM_EPISODES):
+        print("Episode: {}".format(episode))
+
         gm = trainer.gen_game(episode)
         gm.play(trainer)
+
+        print("Number of Turns: {}".format(gm.turn))
 
         # Save model every 5 episodes
         if episode % 5 == 0:
@@ -32,3 +37,4 @@ with tf.Session() as sess:
         if episode % 50 == 0:
             with open("../../resources/replays/{}.txt".format(episode), "w") as f:
                 f.write(json.dumps(gm.logger.output()))
+            print ("Saved Replay")
