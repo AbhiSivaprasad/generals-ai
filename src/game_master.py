@@ -60,7 +60,7 @@ class GameMaster():
             ## NEW CODE
             # Creates the current states/actions to be passed to the trainer
             if (trainer != None and not self.no_action):
-                states = [convert_board(board) for board in views]
+                states = [convert_board(view) for view in self.views]
                 actions = [convert_move(move) for move in moves]
             ## END
 
@@ -131,10 +131,10 @@ class GameMaster():
             ## NEW CODE
             if (trainer != None and not self.no_action):
                 # Creates the next states after move has been taken
-                next_states = [convert_board(view) for view in views]
+                next_states = [convert_board(view) for view in self.views]
                 # Adds the SAS' to the temporary memory and trains for our player
                 for i in range(len(self.players)):
-                    trainer.step(states[i], actions[i], next_states[i], i, board.terminal_status() != -1)
+                    trainer.step(states[i], actions[i], next_states[i], i, self.board.terminal_status() != -1)
             ## END
 
             self.turn += 1
