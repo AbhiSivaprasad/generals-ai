@@ -27,3 +27,8 @@ with tf.Session() as sess:
         if episode % 5 == 0:
             save_path = saver.save(sess, "./models/model.ckpt")
             print("Model Saved")
+
+        # Save game every 50 episodes
+        if episode % 50 == 0:
+            with open("../../resources/replays/{}.txt".format(episode), "w") as f:
+                f.write(json.dumps(gm.logger.output()))
