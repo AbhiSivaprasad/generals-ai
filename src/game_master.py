@@ -45,8 +45,6 @@ class GameMaster():
                 # Tells trainer to calculate rewards and add to real memory
                 if (trainer != None):
                     trainer.convert_temp_memory(winner)
-                    print("Illegal Moves: " + str(self.players[0].illegal_moves))
-                    print("Legal Moves: " + str(self.players[0].legal_moves))
                 ## END
                 return winner
 
