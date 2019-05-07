@@ -1,4 +1,4 @@
-import json
+import math
 import numpy as np
 from src.board_generator import BoardGenerator
 from src.game_master import GameMaster
@@ -9,7 +9,7 @@ from src.players.deep_general import DeepGeneral
 import params
 
 class Trainer:
-    def __init__(self, sess, model, target, memory):
+    def __init__(self, sess, model, target, memory, max_steps=math.inf):
         self._sess = sess
         self._model = model
         self._target = target
@@ -19,6 +19,7 @@ class Trainer:
 
         self._eps = params.MAX_EPS
         self._decay_step = 0
+        self.max_steps = max_steps
 
         self._bg = BoardGenerator()
     

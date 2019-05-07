@@ -47,6 +47,9 @@ class GameMaster():
                     trainer.convert_temp_memory(winner)
                 ## END
                 return winner
+            elif trainer != None and self.turn > trainer.max_steps:
+                print("Game too long, ending...")
+                break
 
             # each player outputs a move given their view
             moves = [player.move(view) if len(list(view.legal_moves)) > 0 else None

@@ -26,7 +26,7 @@ with tf.Session() as sess:
     # Create the memory
     memory = Memory(params.MEMORY_SIZE)
     # Initialize the trainer
-    trainer = Trainer(sess, model, target, memory)
+    trainer = Trainer(sess, model, target, memory, params.MAX_STEPS)
     # Set target vars equal to actual model vars
     sess.run(update_target_graph("model", "target"))
 
@@ -39,6 +39,12 @@ with tf.Session() as sess:
         print("Episode: {}".format(episode))
         gm = trainer.gen_game(episode)
         gm.play(trainer)
+
+        if (gm.turn > trainer.max_steps):
+            print("Episode Abandoned")
+            print()
+            continue
+
         # update tau step count
         tau += gm.turn
 
