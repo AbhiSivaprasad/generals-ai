@@ -138,7 +138,7 @@ class Generals(object):
 
 
   def _make_update(self, data):
-    print("MAP DIFF", data['map_diff'])
+    # print("MAP DIFF", data['map_diff'])
     _apply_diff(self._map, data['map_diff'])
     _apply_diff(self._cities, data['cities_diff'])
     if 'stars' in data:
@@ -147,10 +147,8 @@ class Generals(object):
     row, col = self._map[1], self._map[0]
     self._seen_update = True
 
-    print(not (row == self.board.rows and col == self.board.col))
-
     # if the size of the board given isn't what's expected, quit and rejoin
-    if not (row == self.board.rows and col == self.board.col):
+    if not (row == self.board.rows and col == self.board.cols):
       print('leaving game')
       self._send(["leave_game"])
       self._join_game()
