@@ -3,6 +3,7 @@ import sys
 sys.path.insert(0, '../../')
 
 from src.board_generator import BoardGenerator
+from src.move import Move
 # from src.game_master import GameMaster
 from src.graphics.tile import Tile
 from src.graphics.board import Board
@@ -19,6 +20,9 @@ for i in range(1):
 
     # print(board.serialize())
 
+    # game_master = GameMaster(board, players=[RandomPlayer(), RandomPlayer()], logger=logger)
+    # game_master.play()
+
     logger = Logger(num_players=2)
 
     # player = DeepGeneral()
@@ -28,56 +32,22 @@ for i in range(1):
                  # username='[Bot] head honcho', # already set
                  mode='private', 
                  gameid='CPSC663_test_bot_lobby',
-                 force_start=True
+                 force_start=True,
+                 col=20, row=18
                 )
 
     for update in g.get_updates():
+      if not update['complete']:
+        board = update['board']
 
+        move = player.move(board)
+        print(move)
 
-      print("update:", update)
-      row = update['rows']
-      col = update['cols']
-      pi = update['player_index']
-      gen_y, gen_x = update['generals'][pi]
-      army_grid = update['army_grid']
-      tile_grid = update['tile_grid']
-      generals = update['generals']
-      cities = update['cities']
-
-      board = Board(rows=row, cols=col, player_index=None)
-
-      grid = [  # 2D List of Tile Objects
-              [Tile(board, x, y) for x in range(col)]
-              for y in range(row)
-            ]
-
-      print(len(grid), len(grid[0]), row, col)
-
-      # place terrain
-      for x in range(row):
-        for y in range(col):
-          tile = grid[x][y]
-
-          tile.type = tile_grid[x][y]
-          tile.army = army_grid[x][y]
-
-          if x is gen_x and y is gen_y:
-            tile.is_general = True
-            board.generals[0] = tile
-
-          if (x,y) in cities:
-            tile.is_city = True
-            board.cities.append(tile)
-          
-
-      board.set_grid(grid)
-
-      startx, starty, destx, desty = player.move(board)
-      g.move(startx, starty, destx, desty)
-
-
-    # game_master = GameMaster(board, players=[RandomPlayer(), RandomPlayer()], logger=logger)
-    # game_master.play()
+        g.move(move.startx, move.starty, move.destx, move.desty)
+      
+      else:
+        print(update['result'])
+ 
 
     with open("../../resources/replays/temp2.txt", "w") as f:
         f.write(json.dumps(logger.output()))
