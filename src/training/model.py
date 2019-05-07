@@ -96,7 +96,7 @@ class Model:
         #self._loss = tf.losses.mean_squared_error(self._target_Q, pred_Q)
         #self._loss = tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(self._target_Q, pred_Q))))
         self._loss = tf.losses.huber_loss(self._target_Q, pred_Q)
-        self._optimizer = tf.train.AdamOptimizer(learning_rate=params.LEARNING_RATE).minimize(self._loss)
+        self._optimizer = tf.train.RMSPropOptimizer(learning_rate=params.LEARNING_RATE).minimize(self._loss)
 
     def predict_one(self, state, sess):
         states = state.reshape(1, self._board_width, self._board_height, params.INPUT_DEPTH)
