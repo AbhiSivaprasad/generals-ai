@@ -4,6 +4,9 @@ import threading
 import time
 from websocket import create_connection, WebSocketConnectionClosedException
 
+from src.graphics.tile import Tile
+from src.graphics.board import Board
+
 EMPTY = -1
 MOUNTAIN = -2
 FOG = -3
@@ -20,7 +23,7 @@ _RESULTS = {
 
 class Generals(object):
     def __init__(self, userid, username=None, mode="1v1", gameid=None,
-                 force_start=True, region=None):
+                 force_start=True, region=None, col=20, row=19):
 
         logging.debug("Creating connection")
         self._ws = create_connection(_ENDPOINT)
@@ -57,6 +60,14 @@ class Generals(object):
         time.sleep(2)
         self._send(["set_force_start", gameid, force_start])
 
+        self.board = Board(rows=row, cols=col, player_index=None)
+        self.grid = [  # 2D List of Tile Objects
+              [Tile(board, x, y) for x in range(col)]
+              for y in range(row)
+            ]
+
+        self.board.set_grid(self.grid)
+
         self._seen_update = False
         self._move_id = 1
         self._start_data = {}
@@ -88,7 +99,7 @@ class Generals(object):
             if msg in {"3", "40"}:
                 continue
 
-            print("msg:", msg)
+            # print("msg:", msg)
 
             # remove numeric prefix
             while msg and msg[0].isdigit():
@@ -118,6 +129,7 @@ class Generals(object):
 
 
     def _make_update(self, data):
+        print("MAP DIFF", data['map_diff'])
         _apply_diff(self._map, data['map_diff'])
         _apply_diff(self._cities, data['cities_diff'])
         if 'stars' in data:
@@ -125,6 +137,29 @@ class Generals(object):
 
         rows, cols = self._map[1], self._map[0]
         self._seen_update = True
+
+        pi = self._start_data['playerIndex']
+        generals = [(-1, -1) if g == -1 else (g // cols, g % cols)
+                         for g in data['generals']]
+
+        gen_y, gen_x = generals[pi]
+
+        for x in range(row):
+        for y in range(col):
+          tile = self.grid[x][y]
+
+          tile.type = tile_grid[x][y]
+          tile.army = army_grid[x][y]
+
+          if x == gen_x and y == gen_y:
+            tile.is_general = True
+            self.board.generals[0] = tile
+
+          if (x,y) in cities:
+            tile.is_city = True
+            self.board.cities.append(tile)
+
+
 
         # sort by player index
         scores = {d['i']: d for d in data['scores']}

@@ -3,6 +3,7 @@ import sys
 sys.path.insert(0, '../../')
 
 from src.board_generator import BoardGenerator
+from src.move import Move
 # from src.game_master import GameMaster
 from src.graphics.tile import Tile
 from src.graphics.board import Board
@@ -28,7 +29,9 @@ for i in range(1):
                  # username='[Bot] head honcho', # already set
                  mode='private', 
                  gameid='CPSC663_test_bot_lobby',
-                 force_start=True
+                 force_start=True,
+                 col=20,
+                 row=19
                 )
 
     for update in g.get_updates():
@@ -51,8 +54,6 @@ for i in range(1):
               for y in range(row)
             ]
 
-      print(len(grid), len(grid[0]), row, col)
-
       # place terrain
       for x in range(row):
         for y in range(col):
@@ -61,19 +62,38 @@ for i in range(1):
           tile.type = tile_grid[x][y]
           tile.army = army_grid[x][y]
 
-          if x is gen_x and y is gen_y:
+          if x == gen_x and y == gen_y:
             tile.is_general = True
             board.generals[0] = tile
 
           if (x,y) in cities:
             tile.is_city = True
             board.cities.append(tile)
-          
 
       board.set_grid(grid)
 
-      startx, starty, destx, desty = player.move(board)
-      g.move(startx, starty, destx, desty)
+
+      # is list of all moves, not just legal ones
+      for x in range(row):
+        for y in range(col):
+          tile = grid[x][y]
+
+          for dx, dy in DIRECTIONS:
+            if board.is_valid_position(tile.x + dx, tile.y + dy):
+                # the neighboring tile is not a mountain so we have found a valid move
+                board.legal_moves.add(
+                    Move(startx=tile.x,
+                         starty=tile.y,
+                         destx=tile.x + dx,
+                         desty=tile.y + dy)
+                )
+          
+
+
+      move = player.move(board)
+      print(move)
+
+      g.move(move.startx, move.starty, move.destx, move.desty)
 
 
     # game_master = GameMaster(board, players=[RandomPlayer(), RandomPlayer()], logger=logger)
