@@ -41,7 +41,6 @@ with tf.Session() as sess:
         gm.play(trainer)
 
         if (gm.turn > trainer.max_steps):
-            episode -= 1
             print("Episode Abandoned")
             print()
             continue
@@ -51,13 +50,10 @@ with tf.Session() as sess:
 
         # Logging
         legal_count, illegal_count = gm.players[0].legal_moves, gm.players[0].illegal_moves
-        print("Illegal Moves: " + str(illegal_count))
-        print("Legal Moves: " + str(legal_count))
+        print("Legal Moves: " + str(legal_count) + "/" + str(legal_count + illegal_count), ", Turns: {}".format(gm.turn))
         if (illegal_count != 0 or legal_count != 0):
             illegal_moves.append(illegal_count)
             legal_moves.append(legal_count)
-        print("Number of Turns: {}".format(gm.turn))
-        print("Episode Finished")
 
         if tau > params.MAX_TAU:
             # Update target vars equal to actual model vars

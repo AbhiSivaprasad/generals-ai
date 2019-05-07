@@ -60,8 +60,7 @@ class Trainer:
         loss = self._model.train_batch(states_mb, targets_mb, actions_mb, self._sess)
 
         if (terminal):
-            print("Loss: " + str(loss))
-            print("Eps: " + str(self._eps))
+            print("Loss: " + str(loss) + ", Eps: " + str(self._eps))
 
 
     def gen_game(self, episode_number):
