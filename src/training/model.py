@@ -11,6 +11,7 @@ class Model:
         self._board_width = bw
         self._board_height = bh
         self._num_actions = self._board_width * self._board_height * 4
+        self._is_training = True
 
         self._input_states = None
         self._actions = None
@@ -32,7 +33,7 @@ class Model:
             kernel_initializer=tf.contrib.layers.variance_scaling_initializer(),
             padding="VALID",
             name="conv" + str(i+1))
-        norm = tf.layers.batch_normalization(conv, training=True, name="norm" + str(i+1))
+        norm = tf.layers.batch_normalization(conv, training=self._is_training, name="norm" + str(i+1))
         relu = tf.nn.relu(norm, name="relu" + str(i+1))
         return relu
 
@@ -107,12 +108,10 @@ class Model:
 
     def train_batch(self, x_batch, y_batch, action_batch, sess):
 
-        self.is_training = True
         loss, _ = sess.run([self._loss, self._optimizer],
             feed_dict={ self._input_states: x_batch,
                         self._actions: action_batch,
                         self._target_Q: y_batch })
-        self.is_training = False
         return loss
 
 def convert_board(board):

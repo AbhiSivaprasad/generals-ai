@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 from memory import Memory
 from model import Model
 from trainer import Trainer
@@ -20,22 +21,31 @@ with tf.Session() as sess:
 
     # Initialize the trainer
     trainer = Trainer(sess, model, memory)
+    illegal_moves = []
+    legal_moves = []
 
     for episode in range(params.NUM_EPISODES):
         print("Episode: {}".format(episode))
         gm = trainer.gen_game(episode)
 
         gm.play(trainer)
-
+        legal_count, illegal_count = gm.players[0].legal_moves, gm.players[0].illegal_moves
+        print("Illegal Moves: " + str(illegal_count))
+        print("Legal Moves: " + str(legal_count))
+        if (illegal_count != 0 or legal_count != 0):
+            illegal_moves.append(illegal_count)
+            legal_moves.append(legal_count)
         print("Number of Turns: {}".format(gm.turn))
         print("Episode Finished")
         print()
 
-        # Save model every 5 episodes
-        # if episode % 5 == 0:
-        #     save_path = saver.save(sess, "./models/model")
-        #     print("Model Saved")
-        #     print()
+        # Save model every 50 episodes
+        if (episode % 50 == 0):
+            move_ratio = np.array(legal_moves) / (np.array(legal_moves) + np.array(illegal_moves))
+            np.savetxt("legal_moves.csv", move_ratio, delimiter=",")
+            save_path = saver.save(sess, "./models/model")
+            print("Model Saved")
+            print()
 
         # # Save game every 50 episodes
         # if episode % 100 == 0:
