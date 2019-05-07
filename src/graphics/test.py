@@ -33,11 +33,13 @@ for i in range(1):
                  mode='private', 
                  gameid='CPSC663_test_bot_lobby',
                  force_start=True,
-                 col=20, row=18
+                 col=20,  row=18
                 )
 
     for update in g.get_updates():
-      if not update['complete']:
+      if update['complete']:
+        print(update['result'])
+      elif not update['bad_board']:
         board = update['board']
 
         move = player.move(board)
@@ -45,8 +47,6 @@ for i in range(1):
 
         g.move(move.startx, move.starty, move.destx, move.desty)
       
-      else:
-        print(update['result'])
  
 
     with open("../../resources/replays/temp2.txt", "w") as f:
