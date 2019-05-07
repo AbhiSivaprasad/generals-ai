@@ -41,6 +41,7 @@ with tf.Session() as sess:
         gm.play(trainer)
 
         if (gm.turn > trainer.max_steps):
+            episode -= 1
             print("Episode Abandoned")
             print()
             continue
