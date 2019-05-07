@@ -1,6 +1,3 @@
-import sys
-sys.path.insert(0, '../../')
-
 import json
 import sys
 sys.path.insert(0, '../../')
@@ -35,6 +32,12 @@ for i in range(1):
 
 
       print("update:", update)
+      army_grid = update['army_grid']
+      tile_grid = update['tile_grid']
+      generals = update['generals']
+      cities = update['cities']
+
+
 
       startx, starty, destx, desty = player.move(board)
       g.move(startx, starty, destx, desty)
