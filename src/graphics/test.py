@@ -33,12 +33,11 @@ for i in range(1):
                  mode='private', 
                  gameid='CPSC663_test_bot_lobby',
                  force_start=True,
-                 col=20,
-                 row=18
+                 col=20, row=18
                 )
 
     for update in g.get_updates():
-      if !update['complete']:
+      if not update['complete']:
         board = update['board']
 
         move = player.move(board)

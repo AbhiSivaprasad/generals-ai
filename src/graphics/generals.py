@@ -20,7 +20,13 @@ _RESULTS = {
 
 class Generals(object):
   def __init__(self, userid, username=None, mode="1v1", gameid=None,
-         force_start=True, region=None, col=20, row=18):
+         force_start=True, region=None, col=19, row=19):
+
+    self.userid = userid
+    self.username = username
+    self.mode = mode
+    self.gameid = gameid
+    self.force_start = force_start
 
     logging.debug("Creating connection")
     self._ws = create_connection(_ENDPOINT)
@@ -32,31 +38,13 @@ class Generals(object):
     logging.debug("Joining game")
 
     if isinstance(username, str):
-     self._send(["set_username", userid, username])
+      self._send(["set_username", userid, username])
 
-    if mode == "private":
-      if gameid is None:
-        raise ValueError("Gameid must be provided for private games")
-      self._send(["join_private", gameid, userid])
 
-    elif mode == "1v1":
-      self._send(["join_1v1", userid])
+    # join a game
+    self._join_game()
 
-    elif mode == "team":
-      if gameid is None:
-        raise ValueError("Gameid must be provided for team games")
-      self._send(["join_team", gameid, userid])
-
-    elif mode == "ffa":
-      self._send(["play", userid])
-
-    else:
-      raise ValueError("Invalid mode")
-
-    # delay so that the force start goes through
-    time.sleep(2)
-    self._send(["set_force_start", gameid, force_start])
-
+    # set up the board
     self.board = Board(rows=row, cols=col, player_index=None)
     self.grid = [ # 2D List of Tile Objects
        [Tile(self.board, x, y) for x in range(col)]
@@ -71,6 +59,30 @@ class Generals(object):
     self._stars = []
     self._map = []
     self._cities = []
+
+  def _join_game(self):
+    if self.mode == "private":
+      if self.gameid is None:
+        raise ValueError("Gameid must be provided for private games")
+      self._send(["join_private", self.gameid, self.userid])
+
+    elif self.mode == "1v1":
+      self._send(["join_1v1", self.userid])
+
+    elif self.mode == "team":
+      if self.gameid is None:
+        raise ValueError("Gameid must be provided for team games")
+      self._send(["join_team", self.f, self.userid])
+
+    elif self.mode == "ffa":
+      self._send(["play", self.userid])
+
+    else:
+      raise ValueError("Invalid mode")
+
+    # delay so that the force start goes through
+    time.sleep(2)
+    self._send(["set_force_start", self.gameid, self.force_start])
 
   def move(self, x1, y1, x2, y2, move_half=False):
     if not self._seen_update:
@@ -135,11 +147,16 @@ class Generals(object):
     row, col = self._map[1], self._map[0]
     self._seen_update = True
 
-    self.board = Board(rows=row, cols=col, player_index=None)
-    self.grid = [ # 2D List of Tile Objects
-       [Tile(self.board, x, y) for x in range(col)]
-       for y in range(row)
-      ]
+    # if the size of the board given isn't what's expected, quit and rejoin
+    if row != self.board.rows or col != self.board.col:
+      self.send(["leave_game"])
+      self._join_game()
+
+    # self.board = Board(rows=row, cols=col, player_index=None)
+    # self.grid = [ # 2D List of Tile Objects
+    #    [Tile(self.board, x, y) for x in range(col)]
+    #    for y in range(row)
+    #   ]
 
     self.board.set_grid(self.grid)
 
