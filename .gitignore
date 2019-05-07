@@ -3,5 +3,5 @@ botkit/*
 .idea/*
 resources/replays/*
 src/__pycache__/
-src/graphics/__pycache__/*
+*/__pycache__/*
 src/training/models/*

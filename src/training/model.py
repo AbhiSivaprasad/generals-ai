@@ -45,7 +45,7 @@ class Model:
         # Add convolutional layers
         current_input = self._input_states
         for i in range(params.NUM_CONV_LAYERS):
-            current_input = self._add_conv_layer(current_input, 32, 3, i)
+            current_input = self._add_conv_layer(current_input, 64, 3, i)
         conv_output = self._add_conv_layer(current_input, 2, 1, params.NUM_CONV_LAYERS+1)
 
         # Add fully connected layers
@@ -77,7 +77,7 @@ class Model:
         # self._output = value + tf.subtract(advantage, tf.reduce_mean(advantage, axis=1, keepdims=True))
         
         fc1 = tf.layers.dense(flattened_output,
-            units = 128,
+            units = 512,
             activation = tf.nn.relu,
             kernel_initializer=tf.contrib.layers.variance_scaling_initializer(),
             name="fc1")
