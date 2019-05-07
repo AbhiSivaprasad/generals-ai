@@ -8,7 +8,7 @@ BOARD_HEIGHT = 6
 
 # Training params
 NUM_EPISODES = 100000
-NUM_CONV_LAYERS = 3
+NUM_CONV_LAYERS = 2
 INPUT_DEPTH = 8
 
 # Hyperparameters
