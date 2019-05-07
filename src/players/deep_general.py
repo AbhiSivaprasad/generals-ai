@@ -37,7 +37,6 @@ class DeepGeneral:
                 self.legal_moves += 1
                 return move
             else:
-                # print("illegal move")
                 self.illegal_moves += 1
                 return random.choice(moves)
     
