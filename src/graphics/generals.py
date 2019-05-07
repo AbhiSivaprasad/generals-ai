@@ -18,7 +18,6 @@ _RESULTS = {
     "game_lost": "lose",
 }
 
-
 class Generals(object):
     def __init__(self, userid, username=None, mode="1v1", gameid=None,
                  force_start=True, region=None):
@@ -54,8 +53,8 @@ class Generals(object):
         else:
             raise ValueError("Invalid mode")
 
-
-        print("42" + json.dumps(["set_force_start", gameid, force_start]))
+        # delay so that the force start goes through
+        time.sleep(2)
         self._send(["set_force_start", gameid, force_start])
 
         self._seen_update = False
@@ -65,7 +64,7 @@ class Generals(object):
         self._map = []
         self._cities = []
 
-    def move(self, y1, x1, y2, x2, move_half=False):
+    def move(self, x1, y1, x2, y2, move_half=False):
         if not self._seen_update:
             raise ValueError("Cannot move before first map seen")
 
@@ -116,6 +115,7 @@ class Generals(object):
 
     def close(self):
         self._ws.close()
+
 
     def _make_update(self, data):
         _apply_diff(self._map, data['map_diff'])
