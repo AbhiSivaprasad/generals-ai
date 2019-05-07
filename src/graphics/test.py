@@ -31,64 +31,65 @@ for i in range(1):
                  gameid='CPSC663_test_bot_lobby',
                  force_start=True,
                  col=20,
-                 row=19
+                 row=18
                 )
 
     for update in g.get_updates():
 
 
-      print("update:", update)
-      row = update['rows']
-      col = update['cols']
-      pi = update['player_index']
-      gen_y, gen_x = update['generals'][pi]
-      army_grid = update['army_grid']
-      tile_grid = update['tile_grid']
-      generals = update['generals']
-      cities = update['cities']
+      # print("update:", update)
+      # row = update['rows']
+      # col = update['cols']
+      # pi = update['player_index']
+      # gen_y, gen_x = update['generals'][pi]
+      # army_grid = update['army_grid']
+      # tile_grid = update['tile_grid']
+      # generals = update['generals']
+      # cities = update['cities']
 
-      board = Board(rows=row, cols=col, player_index=None)
+      # board = Board(rows=row, cols=col, player_index=None)
 
-      grid = [  # 2D List of Tile Objects
-              [Tile(board, x, y) for x in range(col)]
-              for y in range(row)
-            ]
+      # grid = [  # 2D List of Tile Objects
+      #         [Tile(board, x, y) for x in range(col)]
+      #         for y in range(row)
+      #       ]
 
-      # place terrain
-      for x in range(row):
-        for y in range(col):
-          tile = grid[x][y]
+      # # place terrain
+      # for x in range(row):
+      #   for y in range(col):
+      #     tile = grid[x][y]
 
-          tile.type = tile_grid[x][y]
-          tile.army = army_grid[x][y]
+      #     tile.type = tile_grid[x][y]
+      #     tile.army = army_grid[x][y]
 
-          if x == gen_x and y == gen_y:
-            tile.is_general = True
-            board.generals[0] = tile
+      #     if x == gen_x and y == gen_y:
+      #       tile.is_general = True
+      #       board.generals[0] = tile
 
-          if (x,y) in cities:
-            tile.is_city = True
-            board.cities.append(tile)
+      #     if (x,y) in cities:
+      #       tile.is_city = True
+      #       board.cities.append(tile)
 
-      board.set_grid(grid)
+      # board.set_grid(grid)
 
 
-      # is list of all moves, not just legal ones
-      for x in range(row):
-        for y in range(col):
-          tile = grid[x][y]
+      # # is list of all moves, not just legal ones
+      # for x in range(row):
+      #   for y in range(col):
+      #     tile = grid[x][y]
 
-          for dx, dy in DIRECTIONS:
-            if board.is_valid_position(tile.x + dx, tile.y + dy):
-                # the neighboring tile is not a mountain so we have found a valid move
-                board.legal_moves.add(
-                    Move(startx=tile.x,
-                         starty=tile.y,
-                         destx=tile.x + dx,
-                         desty=tile.y + dy)
-                )
+      #     for dx, dy in DIRECTIONS:
+      #       if board.is_valid_position(tile.x + dx, tile.y + dy):
+      #           # the neighboring tile is not a mountain so we have found a valid move
+      #           board.legal_moves.add(
+      #               Move(startx=tile.x,
+      #                    starty=tile.y,
+      #                    destx=tile.x + dx,
+      #                    desty=tile.y + dy)
+      #           )
           
 
+      board = update['board']
 
       move = player.move(board)
       print(move)

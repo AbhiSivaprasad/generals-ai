@@ -23,7 +23,7 @@ _RESULTS = {
 
 class Generals(object):
   def __init__(self, userid, username=None, mode="1v1", gameid=None,
-         force_start=True, region=None, col=20, row=19):
+         force_start=True, region=None, col=20, row=18):
 
     logging.debug("Creating connection")
     self._ws = create_connection(_ENDPOINT)
@@ -62,7 +62,7 @@ class Generals(object):
 
     self.board = Board(rows=row, cols=col, player_index=None)
     self.grid = [ # 2D List of Tile Objects
-       [Tile(board, x, y) for x in range(col)]
+       [Tile(self.board, x, y) for x in range(col)]
        for y in range(row)
       ]
 
@@ -135,24 +135,24 @@ class Generals(object):
     if 'stars' in data:
       self._stars[:] = data['stars']
 
-    rows, cols = self._map[1], self._map[0]
+    row, col = self._map[1], self._map[0]
     self._seen_update = True
 
     pi = self._start_data['playerIndex']
-    generals = [(-1, -1) if g == -1 else (g // cols, g % cols)
+    generals = [(-1, -1) if g == -1 else (g // col, g % col)
              for g in data['generals']]
 
     gen_y, gen_x = generals[pi]
 
-    cities = [(c // cols, c % cols) for c in self._cities]
+    cities = [(c // col, c % col) for c in self._cities]
 
-    army_grid = [[self._map[2 + y*cols + x]
-             for x in range(cols)]
-             for y in range(rows)]
+    army_grid = [[self._map[2 + y*col + x]
+             for x in range(col)]
+             for y in range(row)]
 
-    tile_grid = [[self._map[2 + cols*rows + y*cols + x]
-             for x in range(cols)]
-             for y in range(rows)]
+    tile_grid = [[self._map[2 + col*row + y*col + x]
+             for x in range(col)]
+             for y in range(row)]
 
     for x in range(row):
       for y in range(col):
@@ -172,17 +172,18 @@ class Generals(object):
     # is list of all moves, not just legal ones
     for x in range(row):
       for y in range(col):
-       tile = grid[x][y]
+        tile = self.grid[x][y]
 
-       for dx, dy in DIRECTIONS:
-        if board.is_valid_position(tile.x + dx, tile.y + dy):
-          # the neighboring tile is not a mountain so we have found a valid move
-          board.legal_moves.add(
-            Move(startx=tile.x,
-                 starty=tile.y,
-                 destx=tile.x + dx,
-                 desty=tile.y + dy)
-          )
+        if tile.type:
+          for dx, dy in DIRECTIONS:
+            if board.is_valid_position(tile.x + dx, tile.y + dy):
+              # the neighboring tile is not a mountain so we have found a valid move
+              board.legal_moves.add(
+                Move(startx=tile.x,
+                     starty=tile.y,
+                     destx=tile.x + dx,
+                     desty=tile.y + dy)
+              )
 
 
     return {
@@ -195,22 +196,22 @@ class Generals(object):
     # scores = [scores[i] for i in range(len(scores))]
     # return {
     #   'complete': False,
-    #   'rows': rows,
-    #   'cols': cols,
+    #   'row': row,
+    #   'col': col,
     #   'player_index': self._start_data['playerIndex'],
     #   'turn': data['turn'],
-    #   'army_grid': [[self._map[2 + y*cols + x]
-    #          for x in range(cols)]
-    #          for y in range(rows)],
-    #   'tile_grid': [[self._map[2 + cols*rows + y*cols + x]
-    #          for x in range(cols)]
-    #          for y in range(rows)],
+    #   'army_grid': [[self._map[2 + y*col + x]
+    #          for x in range(col)]
+    #          for y in range(row)],
+    #   'tile_grid': [[self._map[2 + col*row + y*col + x]
+    #          for x in range(col)]
+    #          for y in range(row)],
     #   'lands': [s['tiles'] for s in scores],
     #   'armies': [s['total'] for s in scores],
     #   'alives': [not s['dead'] for s in scores],
-    #   'generals': [(-1, -1) if g == -1 else (g // cols, g % cols)
+    #   'generals': [(-1, -1) if g == -1 else (g // col, g % col)
     #         for g in data['generals']],
-    #   'cities': [(c // cols, c % cols) for c in self._cities],
+    #   'cities': [(c // col, c % col) for c in self._cities],
     #   'usernames': self._start_data['usernames'],
     #   'teams': self._start_data.get('teams'),
     #   'stars': self._stars,
