@@ -9,9 +9,10 @@ from src.players.deep_general import DeepGeneral
 import params
 
 class Trainer:
-    def __init__(self, sess, model, memory):
+    def __init__(self, sess, model, target, memory):
         self._sess = sess
         self._model = model
+        self._target = target
 
         self._memory = memory
         self._temp_memory = None
@@ -46,7 +47,11 @@ class Trainer:
         states_mb, actions_mb, rewards_mb, next_states_mb, terminal_mb = map(np.array, zip(*samples))
 
         # Get Q values for next_state 
-        max_next_state_Qs = np.amax(self._model.predict_batch(next_states_mb, self._sess), axis=1)
+        next_state_Qs = self._target.predict_batch(next_states_mb, self._sess)
+        next_actions = np.argmax(self._model.predict_batch(next_states_mb, self._sess), axis=1)
+        max_next_state_Qs = next_state_Qs[np.arange(len(next_state_Qs)), next_actions]
+        # max_next_state_Qs = np.amax(self._model.predict_batch(next_states_mb, self._sess), axis=1)
+
         # We invert the terminal so that if it IS terminal, then we're multiply by 0
         # Since if the next_state is a terminal state, the target is just the reward
         targets_mb = rewards_mb + (1. - terminal_mb) * params.GAMMA * max_next_state_Qs

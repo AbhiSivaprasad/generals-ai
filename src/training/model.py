@@ -7,7 +7,7 @@ import params
 from src.graphics.constants import *
 
 class Model:
-    def __init__(self, bw=None, bh=None):
+    def __init__(self, bw, bh, name):
         self._board_width = bw
         self._board_height = bh
         self._num_actions = self._board_width * self._board_height * 4
@@ -20,10 +20,10 @@ class Model:
         self._output = None
         self._loss = None
         self._optimizer = None
-        self.var_init = None
         self.is_training = False
 
-        self._create_model()
+        with tf.variable_scope(name):
+            self._create_model()
 
     def _add_conv_layer(self, input_tensor, filters, kernal_size, i):
         # Architecture found from alpha zero. Does a conv layer followed by batch normal folled by relu
@@ -47,7 +47,7 @@ class Model:
         current_input = self._input_states
         for i in range(params.NUM_CONV_LAYERS):
             current_input = self._add_conv_layer(current_input, 64, 3, i)
-        conv_output = self._add_conv_layer(current_input, 2, 1, params.NUM_CONV_LAYERS+1)
+        conv_output = self._add_conv_layer(current_input, 2, 1, params.NUM_CONV_LAYERS)
 
         # Add fully connected layers
         flattened_output = tf.layers.flatten(conv_output)
@@ -96,8 +96,7 @@ class Model:
         #self._loss = tf.losses.mean_squared_error(self._target_Q, pred_Q)
         #self._loss = tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(self._target_Q, pred_Q))))
         self._loss = tf.losses.huber_loss(self._target_Q, pred_Q)
-        self._optimizer = tf.train.AdamOptimizer(learning_rate=0.01).minimize(self._loss)
-        self.var_init = tf.global_variables_initializer()
+        self._optimizer = tf.train.AdamOptimizer(learning_rate=params.LEARNING_RATE).minimize(self._loss)
 
     def predict_one(self, state, sess):
         states = state.reshape(1, self._board_width, self._board_height, params.INPUT_DEPTH)
@@ -113,6 +112,16 @@ class Model:
                         self._actions: action_batch,
                         self._target_Q: y_batch })
         return loss
+
+def update_target_graph(from_name, to_name):
+    from_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, from_name)
+    to_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, to_name)
+
+    update_target_vars = []
+    
+    for from_var,to_var in zip(from_vars,to_vars):
+        update_target_vars.append(to_var.assign(from_var))
+    return update_target_vars
 
 def convert_board(board):
     

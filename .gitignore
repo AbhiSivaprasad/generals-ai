@@ -1,7 +1,10 @@
-botkit/*
+**/.DS_Store
+botkit/**
 *.pyc
-.idea/*
-resources/replays/*
+.idea/**
+resources/replays/**
 src/__pycache__/
-*/__pycache__/*
-src/training/models/*
+**/__pycache__/**
+src/training/models/**
+**/models/**
+**/legal_moves.csv
