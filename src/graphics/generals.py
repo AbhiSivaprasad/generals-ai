@@ -4,13 +4,10 @@ import threading
 import time
 from websocket import create_connection, WebSocketConnectionClosedException
 
+from src.move import Move
 from src.graphics.tile import Tile
 from src.graphics.board import Board
-
-EMPTY = -1
-MOUNTAIN = -2
-FOG = -3
-OBSTACLE = -4
+from src.graphics.constants import *
 
 _ENDPOINT = "ws://botws.generals.io/socket.io/?EIO=3&transport=websocket"
 _REPLAY_URL = "http://bot.generals.io/replays/"
@@ -138,6 +135,14 @@ class Generals(object):
     row, col = self._map[1], self._map[0]
     self._seen_update = True
 
+    self.board = Board(rows=row, cols=col, player_index=None)
+    self.grid = [ # 2D List of Tile Objects
+       [Tile(self.board, x, y) for x in range(col)]
+       for y in range(row)
+      ]
+
+    self.board.set_grid(self.grid)
+
     pi = self._start_data['playerIndex']
     generals = [(-1, -1) if g == -1 else (g // col, g % col)
              for g in data['generals']]
@@ -174,11 +179,11 @@ class Generals(object):
       for y in range(col):
         tile = self.grid[x][y]
 
-        if tile.type:
+        if tile.type > -1:
           for dx, dy in DIRECTIONS:
-            if board.is_valid_position(tile.x + dx, tile.y + dy):
+            if self.board.is_valid_position(tile.x + dx, tile.y + dy):
               # the neighboring tile is not a mountain so we have found a valid move
-              board.legal_moves.add(
+              self.board.legal_moves.add(
                 Move(startx=tile.x,
                      starty=tile.y,
                      destx=tile.x + dx,
