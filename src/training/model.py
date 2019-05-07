@@ -96,7 +96,7 @@ class Model:
         #self._loss = tf.losses.mean_squared_error(self._target_Q, pred_Q)
         #self._loss = tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(self._target_Q, pred_Q))))
         # self._loss = tf.losses.huber_loss(self._target_Q, pred_Q)
-        self._optimizer = tf.train.RMSPropOptimizer(learning_rate=0.00025).minimize(self._loss)
+        self._optimizer = tf.train.RMSPropOptimizer(learning_rate=0.001).minimize(self._loss)
         self.var_init = tf.global_variables_initializer()
 
     def predict_one(self, state, sess):
