@@ -34,7 +34,6 @@ class Trainer:
         if (self._memory.low_size()):
             if (terminal):
                 print("Still filling memory...")
-                print("Episode Finished")
             return
 
         # Decay epsilon
@@ -56,11 +55,10 @@ class Trainer:
 
         if (terminal):
             print("Loss: " + str(loss))
-            print("Episode Finished")
+            print("Eps: " + str(self._eps))
 
 
     def gen_game(self, episode_number):
-        print("Starting Episode " + str(episode_number) + "...")
         self._temp_memory = []
         board = self._bg.generate_board_state(params.BOARD_WIDTH, params.BOARD_HEIGHT)
 
@@ -68,8 +66,8 @@ class Trainer:
 
         logger = Logger(num_players=2)
 
-        p1 = DeepGeneral(self._model, self._eps, self._sess)
-        p2 = DeepGeneral(self._model, self._eps, self._sess)
+        p1 = DeepGeneral(self._model, self._sess, self._eps)
+        p2 = DeepGeneral(self._model, self._sess, self._eps)
 
         #print "flag2"
 

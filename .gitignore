@@ -1,3 +1,7 @@
 botkit/*
 *.pyc
 .idea/*
+resources/replays/*
+src/__pycache__/
+src/graphics/__pycache__/*
+src/training/models/*

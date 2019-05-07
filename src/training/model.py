@@ -32,7 +32,7 @@ class Model:
             kernel_initializer=tf.contrib.layers.variance_scaling_initializer(),
             padding="VALID",
             name="conv" + str(i+1))
-        norm = tf.layers.batch_normalization(conv, training=self.is_training, name="norm" + str(i+1))
+        norm = tf.layers.batch_normalization(conv, training=True, name="norm" + str(i+1))
         relu = tf.nn.relu(norm, name="relu" + str(i+1))
         return relu
 
@@ -91,11 +91,11 @@ class Model:
         # Mask the output to only the Q value of the action taken
         pred_Q = tf.reduce_sum(tf.multiply(self._output, self._actions), axis=1)
 
-        #self._loss = tf.reduce_mean(tf.square(self._target_Q - pred_Q))
+        self._loss = tf.reduce_mean(tf.square(self._target_Q - pred_Q))
         #self._loss = tf.losses.mean_squared_error(self._target_Q, pred_Q)
         #self._loss = tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(self._target_Q, pred_Q))))
-        self._loss = tf.losses.huber_loss(self._target_Q, pred_Q)
-        self._optimizer = tf.train.RMSPropOptimizer(learning_rate=0.00025, decay=0.95, epsilon=0.01).minimize(self._loss)
+        # self._loss = tf.losses.huber_loss(self._target_Q, pred_Q)
+        self._optimizer = tf.train.RMSPropOptimizer(learning_rate=0.00025).minimize(self._loss)
         self.var_init = tf.global_variables_initializer()
 
     def predict_one(self, state, sess):

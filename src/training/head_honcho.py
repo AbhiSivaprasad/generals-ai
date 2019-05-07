@@ -28,14 +28,18 @@ with tf.Session() as sess:
         gm.play(trainer)
 
         print("Number of Turns: {}".format(gm.turn))
+        print("Episode Finished")
+        print()
 
         # Save model every 5 episodes
-        if episode % 5 == 0:
-            save_path = saver.save(sess, "./models/model")
-            print("Model Saved")
+        # if episode % 5 == 0:
+        #     save_path = saver.save(sess, "./models/model")
+        #     print("Model Saved")
+        #     print()
 
-        # Save game every 50 episodes
-        if episode % 100 == 0:
-            with open("../../resources/replays/{}.txt".format(episode), "w") as f:
-                f.write(json.dumps(gm.logger.output()))
-            print ("Saved Replay")
+        # # Save game every 50 episodes
+        # if episode % 100 == 0:
+        #     with open("../../resources/replays/{}.txt".format(episode), "w") as f:
+        #         f.write(json.dumps(gm.logger.output()))
+        #     print ("Saved Replay")
+        #     print()

@@ -3,6 +3,7 @@ import tensorflow as tf
 import numpy as np
 from src.graphics.constants import *
 from src.training.model import *
+from src.move import Move
 
 
 class DeepGeneral:
@@ -36,14 +37,14 @@ class DeepGeneral:
                 self.legal_moves += 1
                 return move
             else:
-                print "illegal move"
+                # print("illegal move")
                 self.illegal_moves += 1
                 return random.choice(moves)
     
-    def convert_action(action):
-        y = action // (board.cols * 4)
-        x = (action - (y * board.cols * 4)) // 4
-        dr = action - ((y * board.cols * 4) + x * 4)
+    def convert_action(self, action):
+        y = action // (params.BOARD_WIDTH * 4)
+        x = (action - (y * params.BOARD_WIDTH * 4)) // 4
+        dr = action - ((y * params.BOARD_WIDTH * 4) + x * 4)
         
         move = Move(x,y, x + DIRECTIONS[dr][0], y + DIRECTIONS[dr][1])
         
