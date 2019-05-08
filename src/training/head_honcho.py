@@ -40,6 +40,7 @@ with tf.Session() as sess:
         gm = trainer.gen_game(episode)
         gm.play(trainer)
 
+        # Drop really long games to improve training times
         if (gm.turn > trainer.max_steps):
             print("Episode Abandoned")
             print()
@@ -55,8 +56,9 @@ with tf.Session() as sess:
             illegal_moves.append(illegal_count)
             legal_moves.append(legal_count)
 
+        # Fixed Q-Target
+        # Update target vars equal to actual model vars
         if tau > params.MAX_TAU:
-            # Update target vars equal to actual model vars
             sess.run(update_target_graph("model", "target"))
             tau = 0
             print("######## Target Model Updated ########")

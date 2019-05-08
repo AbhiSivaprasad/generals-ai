@@ -47,10 +47,12 @@ class Trainer:
         samples = self._memory.sample(params.BATCH_SIZE)
         states_mb, actions_mb, rewards_mb, next_states_mb, terminal_mb = map(np.array, zip(*samples))
 
-        # Get Q values for next_state 
+        # Get Q values for next_state
+        # Double DQN 
         next_state_Qs = self._target.predict_batch(next_states_mb, self._sess)
         next_actions = np.argmax(self._model.predict_batch(next_states_mb, self._sess), axis=1)
         max_next_state_Qs = next_state_Qs[np.arange(len(next_state_Qs)), next_actions]
+        # Vanilla DQN
         # max_next_state_Qs = np.amax(self._model.predict_batch(next_states_mb, self._sess), axis=1)
 
         # We invert the terminal so that if it IS terminal, then we're multiply by 0
@@ -67,14 +69,10 @@ class Trainer:
         self._temp_memory = []
         board = self._bg.generate_board_state(params.BOARD_WIDTH, params.BOARD_HEIGHT)
 
-        #print "flag1"
-
         logger = Logger(num_players=2)
 
         p1 = DeepGeneral(self._model, self._sess, self._eps)
         p2 = DeepGeneral(self._model, self._sess, self._eps)
-
-        #print "flag2"
 
         return GameMaster(board, players=[p1, p2], logger=logger)
 
