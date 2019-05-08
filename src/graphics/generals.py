@@ -129,7 +129,7 @@ class Generals(object):
         yield self._make_update(msg[1])
       elif msg[0] in ["game_won", "game_lost"]:
         yield self._make_result(msg[0], msg[1])
-        break
+        # break
       else:
         logging.info("Unknown message type: {}".format(msg))
 
@@ -138,7 +138,7 @@ class Generals(object):
 
 
   def _make_update(self, data):
-    print("MAP DIFF", data['map_diff'])
+    # print("MAP DIFF", data['map_diff'])
     _apply_diff(self._map, data['map_diff'])
     _apply_diff(self._cities, data['cities_diff'])
     if 'stars' in data:
@@ -148,9 +148,15 @@ class Generals(object):
     self._seen_update = True
 
     # if the size of the board given isn't what's expected, quit and rejoin
-    if row != self.board.rows or col != self.board.col:
-      self.send(["leave_game"])
+    if not (row == self.board.rows and col == self.board.cols):
+      print('leaving game')
+      self._send(["leave_game"])
       self._join_game()
+      return {
+        'complete': False,
+        'bad_board': True
+      }
+
 
     # self.board = Board(rows=row, cols=col, player_index=None)
     # self.grid = [ # 2D List of Tile Objects
@@ -209,6 +215,7 @@ class Generals(object):
 
 
     return {
+      'bad_board': False,
       'complete': False,
       'turn': data['turn'],
       'board': self.board
