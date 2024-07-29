@@ -64,7 +64,7 @@ class Board:
         :param board: Board instance
         :return: dict
         """
-        return [tile.serialize() for row in self.grid for tile in row]
+        return [[tile.serialize() for tile in row] for row in self.grid]
 
     def is_action_valid(self, action: Action, player_index: int):
         """
