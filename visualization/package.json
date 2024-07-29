@@ -1,28 +1,43 @@
 {
   "name": "visualization",
-  "version": "0.1.0",
-  "private": true,
-  "dependencies": {
-    "express": "^4.16.4",
-    "react": "^16.7.0",
-    "react-dom": "^16.7.0",
-    "react-scripts": "2.1.2",
-    "typeface-quicksand": "0.0.71"
-  },
+  "version": "1.0.0",
+  "description": "This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).",
+  "main": "src/index.js",
+  "author": "",
+  "license": "ISC",
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "start": "craco start",
+    "build": "craco build",
+    "test": "craco test",
+    "eject": "craco eject",
+    "dev": "cross-env NODE_ENV=development craco start"
   },
-  "eslintConfig": {
-    "extends": "react-app"
+  "dependencies": {
+    "axios": "^1.7.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-scripts": "^5.0.1",
+    "typeface-quicksand": "^1.1.13",
+    "typescript": "^4.9.5",
+    "web-vitals": "^4.2.2"
   },
-  "browserslist": [
-    ">0.2%",
-    "not dead",
-    "not ie <= 11",
-    "not op_mini all"
-  ],
-  "proxy": "http://localhost:5000"
+  "devDependencies": {
+    "@craco/craco": "^7.1.0",
+    "@eslint/js": "^9.8.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.3",
+    "eslint": "^8.57.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
 }
