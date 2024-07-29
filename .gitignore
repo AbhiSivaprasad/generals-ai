@@ -8,3 +8,4 @@ src/__pycache__/**
 src/training/models/**
 **/models/**
 **/legal_moves.csv
+.vscode/**
