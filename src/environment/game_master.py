@@ -65,10 +65,14 @@ class GameMaster:
                 # increment player's land every 50 turns
                 if (
                     tile.type == TileType.GENERAL
-                    or (tile.type == TileType.CITY and tile.player_index is not None)
-                    or (tile.type == TileType.NORMAL and self.turn % (25 * 2) == 0)
+                    or
+                    (tile.player_index is not None and
+                     (tile.type == TileType.CITY or
+                      (tile.type == TileType.NORMAL and self.turn % (25 * 2) == 0))
+                    )
                 ):
                     tile.army += 1
+                    self._log(tile)
 
     def update_game_state(self, action: Action):
         """

@@ -80,7 +80,7 @@ class Cell extends Component {
 
         return (
             <td style={cellStyle}>
-                {this.props.data.army !== 0 ? this.props.data.army : null}
+                {((!this.props.playerIndex || cell.player_visibilities[this.props.playerIndex]) && this.props.data.army !== 0) && this.props.data.army}
             </td>
         )
     }

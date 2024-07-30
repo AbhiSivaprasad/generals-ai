@@ -8,7 +8,7 @@ from src.environment.game_master import GameMaster
 from src.environment.logger import Logger
 
 
-board = generate_board_state(15, 15)
+board = generate_board_state(15, 15, mountain_probability=0.2, city_probability=0.03)
 
 logger = Logger()
 game_master = GameMaster(
