@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from typing import Dict, List
+from src.environment.board import Board
 from src.environment.tile import Tile
 
 
@@ -15,7 +16,7 @@ class Logger:
             [] if serialized_board_diffs is None else serialized_board_diffs
         )
 
-    def init(self, board):
+    def init(self, board: Board):
         self.serialized_board = board.serialize()
 
     def log(self, tile: Tile, turn: int):

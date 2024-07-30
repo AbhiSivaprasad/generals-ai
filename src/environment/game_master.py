@@ -3,6 +3,7 @@ import random as rand
 import math
 
 from src.environment.board import Board
+from src.environment.logger import Logger
 from src.environment.tile import Tile, TileType
 from src.environment.action import Action, convert_direction_to_vector
 
@@ -12,7 +13,7 @@ class GameMaster:
     handles game state
     """
 
-    def __init__(self, board, players, max_turns=None, logger=None):
+    def __init__(self, board, players, max_turns=None, logger: Logger=None):
         self.board = board
         self.board.player_index = None
         self.logger = logger

@@ -8,6 +8,10 @@ from src.environment.logger import Logger
 
 
 board = generate_board_state(15, 15)
+# print(board.serialize())
+# import pdb
+
+# pdb.set_trace()
 
 logger = Logger()
 game_master = GameMaster(
