@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 
@@ -8,10 +9,6 @@ from src.environment.logger import Logger
 
 
 board = generate_board_state(15, 15)
-# print(board.serialize())
-# import pdb
-
-# pdb.set_trace()
 
 logger = Logger()
 game_master = GameMaster(
@@ -22,3 +19,10 @@ game_master.play()
 replays_dir = Path("resources/replays")
 replays_dir.mkdir(parents=True, exist_ok=True)
 logger.write(replays_dir / "test_replay.txt")
+
+replays_dir = Path("resources/replays")
+replay_path = replays_dir / "test_replay.txt"
+
+# read json file replay_path
+with open(replay_path, "r") as f:
+    data = json.load(f)
