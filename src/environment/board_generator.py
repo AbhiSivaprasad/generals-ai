@@ -14,7 +14,7 @@ def generate_board_state(
     num_cols: int,
     mountain_probability: float = 0,
     city_probability: float = 0,
-    min_ratio_of_generals_distance_to_board_side: float = 2 / 3,
+    min_ratio_of_generals_distance_to_board_side: float = 2.0 / 3,
 ) -> Board:
     """Create a new game board with the given parameters"""
 

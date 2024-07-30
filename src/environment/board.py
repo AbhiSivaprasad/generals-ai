@@ -126,7 +126,7 @@ class Board:
                     0 <= tile.y + dy <= self.num_rows - 1
                     and 0 <= tile.x + dx <= self.num_cols - 1
                 ):
-                    tiles.append(self.grid[tile.x + dx][tile.y + dy])
+                    tiles.append(self.grid[tile.y + dy][tile.x + dx])
         return tiles
 
     def add_vision(self, tile: Tile, player_index: int):
