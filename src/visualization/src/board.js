@@ -13,7 +13,7 @@ class Board extends Component {
                 <tbody>
                     {
                         this.props.data.map((item, index) => {
-                            return <Row data={item} key={index} />
+                            return <Row data={item} key={index} playerIndex={this.props.playerIndex} />
                         })
                     }
                 </tbody>

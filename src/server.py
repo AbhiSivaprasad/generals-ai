@@ -5,7 +5,7 @@ app = Flask(__name__)
 
 @app.route('/replay')
 def replay():
-    with open('../resources/replays/{}.txt'.format(6300), 'r') as file:
+    with open('../resources/replays/{}.txt'.format("test_replay"), 'r') as file:
         r = make_response(file.read())
         r.headers['Access-Control-Allow-Origin'] = "*"
         return r

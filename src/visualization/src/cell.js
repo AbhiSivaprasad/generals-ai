@@ -20,39 +20,55 @@ class Cell extends Component {
         };
 
         const playerColors = ["blue", "red"];
-        const playerMemoryColors = ["#1a114f", "#4f0721"];
-        switch (this.props.data.type) {
-            case -4:
-            case -3:
-                // fog obstacle or no obstacle
-                cellStyle["backgroundColor"] = "rgba(0, 0, 0, 0.6)";
-                cellStyle["borderWidth"] = 0;
+
+        cellStyle["backgroundColor"] = "rgba(0, 0, 0, 0.6)";
+        cellStyle["borderWidth"] = 0;
+
+        const cell = this.props.data;
+
+        switch (cell.type) {
+            case "normal":
+                if(!this.props.playerIndex || cell.player_visibilities[this.props.playerIndex]) {
+                    if(cell.player_index != null) {
+                        cellStyle["backgroundColor"] = playerColors[cell.player_index];
+                    }
+                    else {
+                        cellStyle["backgroundColor"] = "#dcdcdc";
+                    }
+                }
                 break;
-            case -2:
-                // visible mountain
-                cellStyle["backgroundColor"] = "#bbb";
+            case "general":
+                if(!this.props.playerIndex || cell.player_visibilities[this.props.playerIndex]) {
+                    cellStyle["backgroundImage"] = `url(${CrownBackground})`;
+                    if(cell.player_index != null) {
+                        cellStyle["backgroundColor"] = playerColors[cell.player_index];
+                    }
+                    else {
+                        console.error("GENERAL CELL HAS NO PLAYER INDEX!");
+                    }
+                }
                 break;
-            case -1:
+            case "mountain":
+                cellStyle["backgroundImage"] = `url(${MountainBackground})`;
+                if(!this.props.playerIndex || cell.player_visibilities[this.props.playerIndex]) {
+                    cellStyle["backgroundColor"] = "#bbb";
+                }
+                break;
+            case "city":
                 // visible empty (city, no city)
-                cellStyle["backgroundColor"] = this.props.data.isCity ? "gray" : "#dcdcdc";
+                cellStyle["backgroundImage"] = `url(${MountainBackground})`;
+                if(!this.props.playerIndex || cell.player_visibilities[this.props.playerIndex]) {
+                    cellStyle["backgroundImage"] = `url(${CityBackground})`;
+                    if(cell.player_index != null) {
+                        cellStyle["backgroundColor"] = playerColors[cell.player_index];
+                    }
+                    else {
+                        cellStyle["backgroundColor"] = "gray";
+                    }
+                }
                 break;
             default:
-                // player index
-                cellStyle["backgroundColor"] = playerColors[this.props.data.type];
-        }
-
-        if(this.props.data.hasOwnProperty("memory") && this.props.data.memory !== -1) {
-            // this is a cell which is fogged but "remembered"
-            cellStyle["backgroundColor"] = playerMemoryColors[this.props.data.memory]
-        }
-
-        // set background image for cell
-        if(this.props.data.isCity) {
-            cellStyle["backgroundImage"] = `url(${CityBackground})`;
-        } else if(this.props.data.isGeneral) {
-            cellStyle["backgroundImage"] = `url(${CrownBackground})`;
-        } else if(this.props.data.type === -2 || this.props.data.type === -4) {
-            cellStyle["backgroundImage"] = `url(${MountainBackground})`;
+                break;
         }
 
         // if background image was added then set background style to 100%

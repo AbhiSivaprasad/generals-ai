@@ -27,7 +27,7 @@ class Replay extends Component {
     render() {
         return this.props.boardStates.length !== 0 && (
                 <div>
-                    <Board data={this.props.boardStates[this.state.time]} />
+                    <Board data={this.props.boardStates[this.state.time]} playerIndex={this.props.playerIndex} />
                     <PlayBar onAutoPlaySpeedClickFactory={this.onAutoPlaySpeedClickFactory}
                              onPlayButtonClick={this.onPlayButtonClick}
                              onPauseButtonClick={this.onPauseButtonClick}

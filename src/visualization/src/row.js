@@ -7,7 +7,7 @@ class Row extends Component {
             <tr className="row">
                 {
                     this.props.data.map((item, index) => {
-                        return <Cell data={item} key={index} />
+                        return <Cell data={item} key={index} playerIndex={this.props.playerIndex} />
                     })
                 }
             </tr>
