@@ -48,7 +48,7 @@ class Tile(object):
             "type": self.type.value,
             "army": self.army,
             "player_index": self.player_index,
-            "player_visibilities": self.player_visibilities,
+            "player_visibilities": self.player_visibilities.copy(),
         }
 
     def set_neighbors(self, board):
