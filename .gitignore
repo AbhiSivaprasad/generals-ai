@@ -9,3 +9,4 @@ src/training/models/**
 **/models/**
 **/legal_moves.csv
 .vscode/**
+.python-version

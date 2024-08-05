@@ -26,3 +26,13 @@ def convert_direction_to_vector(direction: Direction) -> Tuple[int, int]:
         return -1, 0
     elif direction == Direction.RIGHT:
         return 1, 0
+
+def convert_vector_to_direction(vector: Tuple[int, int]) -> Direction:
+    if vector == (0, 1):
+        return Direction.UP
+    elif vector == (0, -1):
+        return Direction.DOWN
+    elif vector == (-1, 0):
+        return Direction.LEFT
+    elif vector == (1, 0):
+        return Direction.RIGHT
