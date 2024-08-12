@@ -1,20 +1,24 @@
-import random
+import numpy as np
 
 from src.agents.agent import Agent
 from src.environment.action import Action, Direction
+from src.environment.gamestate import GameState
 
 
 class RandomAgent(Agent):
-    def move(self, board):
-        valid_actions = []
-        for i in range(board.num_rows):
-            for j in range(board.num_cols):
-                for direction in Direction:
-                    action = Action(startx=i, starty=j, direction=direction)
-                    if board.is_action_valid(action, self.player_index):
-                        valid_actions.append(action)
-
+    rng: np.random.Generator
+    
+    def __init__(self, player_index, seed=0, *args, **kwargs):
+        self.reset(seed)
+        super().__init__(player_index, *args, **kwargs)
+    
+    def reset(self, seed):
+        self.rng = np.random.default_rng(seed)
+        
+    def move(self, gamestate: GameState) -> Action:
+        valid_actions = gamestate.board.get_valid_actions(self.player_index)
         if len(valid_actions) > 0:
-            return random.choice(valid_actions)
+            ind = self.rng.integers(len(valid_actions), endpoint=True)
+            return valid_actions[ind] if ind < len(valid_actions) else None
         else:
             return None

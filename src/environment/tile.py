@@ -14,6 +14,13 @@ class TileType(Enum):
 
 
 class Tile(object):
+    x: int
+    y: int
+    type: TileType
+    player_visibilities: Optional[List[bool]]
+    player_index: Optional[int]
+    army: int
+    
     def __init__(
         self,
         board,
@@ -22,7 +29,7 @@ class Tile(object):
         type: Optional[TileType] = None,
         player_visibilities: Optional[List[bool]] = None,
         player_index: Optional[int] = None,
-        army: Optional[int] = None,
+        army: int = 0,
     ):
         # tile properties
         self.x = x
