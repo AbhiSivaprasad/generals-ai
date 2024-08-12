@@ -1,16 +1,11 @@
-import random as rand
-
-import math
-
 from src.environment.board import Board
 from src.environment.gamestate import GameState
 from src.environment.logger import Logger
-from src.environment.tile import Tile, TileType
-from src.environment.action import Action, convert_direction_to_vector
-
+from src.environment.tile import TileType
+from src.environment.action import Action
 from src.agents.agent import Agent
 
-from typing import List
+from typing import Generator, List, Optional
 
 
 class GameMaster:
@@ -19,8 +14,9 @@ class GameMaster:
     """
     players: List[Agent]
     state: GameState
+    max_turns: Optional[int]
 
-    def __init__(self, board, players: List[Agent], max_turns=None, logger:Logger=None):
+    def __init__(self, board: Board, players: List[Agent], max_turns=None, logger:Logger=None):
         self.logger = logger
         self.players = players
         self.state = GameState(board, [0] * len(players), 0)
@@ -29,13 +25,9 @@ class GameMaster:
         if self.logger is not None:
             # log initial board configuration
             self.logger.init(self.state.board)
-
-    def play(self):
-        """
-        conduct game between players on given board
-        :return: index of winning player or -1 if max turns reached
-        """
-        while self.state.board.terminal_status() == -1 and self.state.turn < self.max_turns:
+    
+    def step(self) -> Generator[GameState, None, None]:
+        while self.state.board.terminal_status() == -1 and (self.max_turns is None or self.state.turn < self.max_turns):
             # each player outputs a move given their view
             for moving_player_index, player in list(enumerate(self.players)):
                 action = player.move(self.state)
@@ -53,6 +45,17 @@ class GameMaster:
             self.add_troops_to_board()
 
             self.state.turn += 1
+            
+            self.state.terminal_status = self.state.board.terminal_status()
+            
+            yield self.state
+
+    def play(self):
+        """
+        conduct game between players on given board
+        :return: index of winning player or -1 if max turns reached
+        """
+        _ = list(self.step())
 
         return self.state.board.terminal_status()
 
