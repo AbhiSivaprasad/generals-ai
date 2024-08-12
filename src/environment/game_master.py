@@ -27,6 +27,8 @@ class GameMaster:
             self.logger.init(self.state.board)
     
     def step(self) -> Generator[GameState, None, None]:
+        assert len(self.players) == 2 and self.players[0] is not None and self.players[1] is not None, "Game must have 2 players."
+        
         while self.state.board.terminal_status() == -1 and (self.max_turns is None or self.state.turn < self.max_turns):
             # each player outputs a move given their view
             for moving_player_index, player in list(enumerate(self.players)):
