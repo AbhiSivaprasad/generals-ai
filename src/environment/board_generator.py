@@ -1,4 +1,5 @@
-import random as rand
+from typing import Optional
+import numpy as np
 import math
 
 from src.environment.board import Board
@@ -15,6 +16,7 @@ def generate_board_state(
     mountain_probability: float = 0,
     city_probability: float = 0,
     min_ratio_of_generals_distance_to_board_side: float = 2.0 / 3,
+    rng: np.random.Generator = np.random.default_rng(0)
 ) -> Board:
     """Create a new game board with the given parameters"""
 
@@ -26,6 +28,7 @@ def generate_board_state(
             mountain_probability=mountain_probability,
             city_probability=city_probability,
             min_ratio_of_generals_distance_to_board_side=min_ratio_of_generals_distance_to_board_side,
+            rng=rng
         )
 
         # validate board
@@ -42,6 +45,7 @@ def generate_candidate_board_state(
     mountain_probability: float = 0,
     city_probability: float = 0,
     min_ratio_of_generals_distance_to_board_side: float = 2 / 3,
+    rng: np.random.Generator = np.random.default_rng(0)
 ):
     # generals shouldn't be placed too close to each other
     min_distance = math.ceil(
@@ -50,8 +54,8 @@ def generate_candidate_board_state(
 
     board = Board(num_rows=num_rows, num_cols=num_cols)
     while True:
-        p1_general_position = _random_position(num_rows, num_cols)
-        p2_general_position = _random_position(num_rows, num_cols)
+        p1_general_position = _random_position(num_rows, num_cols, rng)
+        p2_general_position = _random_position(num_rows, num_cols, rng)
 
         if _get_distance(p1_general_position, p2_general_position) >= min_distance:
             break
@@ -73,11 +77,11 @@ def generate_candidate_board_state(
                 tile.player_index = 1
                 tile.army = 1
                 board.generals[1] = tile
-            elif rand.random() < city_probability:
+            elif rng.random() < city_probability:
                 tile.type = TileType.CITY
                 tile.army = _random_city_size()
                 board.cities.append(tile)
-            elif rand.random() < mountain_probability:
+            elif rng.random() < mountain_probability:
                 tile.type = TileType.MOUNTAIN
             else:
                 tile.type = TileType.NORMAL
@@ -92,12 +96,16 @@ def generate_candidate_board_state(
     return board
 
 
-def _random_city_size():
-    return rand.randint(MIN_CITY_SIZE, MAX_CITY_SIZE)
+def _random_city_size(rng: Optional[np.random.Generator]):
+    if rng:
+        return rng.integers(MIN_CITY_SIZE, MAX_CITY_SIZE, endpoint=True)
+    return np.random.randint(MIN_CITY_SIZE, MAX_CITY_SIZE)
 
 
-def _random_position(row, col):
-    return rand.randint(0, row - 1), rand.randint(0, col - 1)
+def _random_position(row, col, rng: Optional[np.random.Generator]):
+    if rng:
+        return rng.integers(0, row), rng.integers(0, col)
+    return np.random.randint(0, row), np.random.randint(0, col)
 
 
 def _get_distance(pos1, pos2):

@@ -1,5 +1,5 @@
 from collections import deque
-from typing import List, Set
+from typing import List, Optional, Set
 from src.environment.action import Action, convert_direction_to_vector
 from src.environment.tile import Tile, TileType
 from src.environment.action import Action, Direction
@@ -66,7 +66,7 @@ class Board:
         """
         return [[tile.serialize() for tile in row] for row in self.grid]
 
-    def is_action_valid(self, action: Action, player_index: int):
+    def is_action_valid(self, action: Optional[Action], player_index: int):
         """
         Check if player's action is valid
 
@@ -75,6 +75,9 @@ class Board:
         3. player owns start tile
         4. more than one troop on start tile
         """
+        if action is None:
+            return True
+        
         # check that start tile is within bounds and not a mountain
         if not self.is_valid_position(action.startx, action.starty):
             return False
