@@ -8,9 +8,9 @@ from src.environment.game_master import GameMaster
 from src.environment.logger import Logger
 
 
-board = generate_board_state(15, 15, mountain_probability=0.2, city_probability=0.03)
 
 logger = Logger()
+board = generate_board_state(15, 15, mountain_probability=0.2, city_probability=0.03)
 game_master = GameMaster(
     board, players=[RandomAgent(0), RandomAgent(1)], logger=logger, max_turns=1000
 )

@@ -165,6 +165,14 @@ class Board:
 
         tile.player_visibilities[player_index] = has_vision
 
+    def get_player_score(self, player_index: int) -> int:
+        score = 0
+        for row in self.grid:
+            for tile in row:
+                if tile.player_index == player_index:
+                    score += tile.army
+        return score
+
     def _get_destination_tile(self, start_tile: Tile, action: Action):
         direction_vector = convert_direction_to_vector(action.direction)
         dest_x = start_tile.x + direction_vector[0]
