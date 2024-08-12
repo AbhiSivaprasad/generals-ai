@@ -3,7 +3,18 @@ from src.environment.board import Board
 from src.environment.tile import Tile, TileType
 
 
-def convert_state_to_tensor(state: Board, player_index: int, fog_of_war: bool):
+def convert_state_to_tensor(state: Board, n_players: int, fog_of_war: bool):
+    return torch.stack(
+        [
+            convert_state_to_tensor_for_player(state, player_index, fog_of_war)
+            for player_index in range(n_players)
+        ]
+    )
+
+
+def convert_state_to_tensor_for_player(
+    state: Board, player_index: int, fog_of_war: bool
+):
     state_tensor = torch.stack(
         [
             convert_tile_to_tensor(tile, player_index, fog_of_war)
@@ -15,7 +26,7 @@ def convert_state_to_tensor(state: Board, player_index: int, fog_of_war: bool):
 
 
 def convert_tile_to_tensor(tile: Tile, player_index: int, fog_of_war: bool):
-    tile_state = torch.zeros(9 if fog_of_war else 7)
+    tile_state = torch.zeros(get_input_channel_dimension_size(fog_of_war))
     has_vision = tile.player_visibilities[player_index] or not fog_of_war
 
     # indices 0, 1 represents player 0, 1
@@ -44,3 +55,7 @@ def convert_tile_to_tensor(tile: Tile, player_index: int, fog_of_war: bool):
 
     tile_state[tile_type + 3] = 1
     return tile_state
+
+
+def get_input_channel_dimension_size(fog_of_war: bool):
+    return 9 if fog_of_war else 7
