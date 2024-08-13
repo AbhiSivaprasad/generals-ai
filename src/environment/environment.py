@@ -31,6 +31,7 @@ class GeneralsEnvironment(gymnasium.Env):
         self.mountain_probabilitiy = mountain_probabilitiy
         self.city_probabilitiy = city_probabilitiy
         self.use_fog_of_war = use_fog_of_war
+        self.n_step = 0
 
         # spaces
         self.action_space = gymnasium.spaces.Discrete(board_x_size * board_y_size * 4)
@@ -49,6 +50,7 @@ class GeneralsEnvironment(gymnasium.Env):
     def step(self, actions: List[Action]):
         # execute one tick of the game
         self.game_master.step(actions)
+        self.n_step += 1
 
         # return the new state, reward, terminal status, and info dict
         observation = convert_state_to_array(
@@ -57,9 +59,10 @@ class GeneralsEnvironment(gymnasium.Env):
         rewards = [
             self.game_master.board.get_player_score(i) for i in range(len(self.players))
         ]
-        done = self.board.terminal_status() != -1
+        terminated = self.game_master.board.terminal_status() != -1
+        truncated = self.n_step >= self.max_turns
         info = {}
-        return (observation, rewards, done, info)
+        return (observation, rewards, terminated, truncated, info)
 
     def reset(self, seed=None, options: Dict = {}):
         super().reset(seed=seed)

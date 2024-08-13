@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from src.environment.action import Action, Direction
 from src.environment.board import Board
 from src.environment.tile import Tile, TileType
 
@@ -60,3 +61,10 @@ def convert_tile_to_array(tile: Tile, player_index: int, fog_of_war: bool):
 
 def get_input_channel_dimension_size(fog_of_war: bool):
     return 9 if fog_of_war else 7
+
+
+def convert_action_index_to_action(action_index: int, n_columns: int):
+    x = (action_index // 4) % n_columns
+    y = action_index // (4 * n_columns)
+    direction = action_index % 4
+    return Action(startx=x, starty=y, direction=Direction(direction))

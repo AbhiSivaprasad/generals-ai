@@ -34,8 +34,11 @@ import torch.nn.functional as F
 from src.environment.environment import GeneralsEnvironment
 from src.agents.random_agent import RandomAgent
 from src.training.dqn.dqn import DQN
-from src.training.input import get_input_channel_dimension_size
-from src.training.dqn.replay_memory import ReplayMemory
+from src.training.input import (
+    get_input_channel_dimension_size,
+    convert_action_index_to_action,
+)
+from src.training.dqn.replay_memory import ReplayMemory, Transition
 
 # %%
 gym.register(
@@ -105,14 +108,12 @@ def select_action(state):
     steps_done += 1
     if sample > eps_threshold:
         with torch.no_grad():
-            # t.max(1) will return the largest column value of each row.
-            # second column on max result is index of where max element was
-            # found, so we pick action with the larger expected reward.
-            return policy_net(state).max(1).indices.view(1, 1)
+            # argmax returns the indices of the maximum values along the specified dimension
+            return policy_net(state).argmax(dim=1).squeeze()
     else:
         return torch.tensor(
             [[env.action_space.sample()]], device=device, dtype=torch.long
-        )
+        ).squeeze()
 
 
 # %%
@@ -150,10 +151,8 @@ def plot_durations(show_result=False):
 def optimize_model():
     if len(memory) < BATCH_SIZE:
         return
+
     transitions = memory.sample(BATCH_SIZE)
-    # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
-    # detailed explanation). This converts batch-array of Transitions
-    # to Transition of batch-arrays.
     batch = Transition(*zip(*transitions))
 
     # Compute a mask of non-final states and concatenate the batch elements
@@ -163,15 +162,15 @@ def optimize_model():
         device=device,
         dtype=torch.bool,
     )
-    non_final_next_states = torch.cat([s for s in batch.next_state if s is not None])
-    state_batch = torch.cat(batch.state)
-    action_batch = torch.cat(batch.action)
-    reward_batch = torch.cat(batch.reward)
+    non_final_next_states = torch.stack([s for s in batch.next_state if s is not None])
+    state_batch = torch.stack(batch.state)
+    action_batch = torch.stack(batch.action)
+    reward_batch = torch.stack(batch.reward)
 
     # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
     # columns of actions taken. These are the actions which would've been taken
     # for each batch state according to policy_net
-    state_action_values = policy_net(state_batch).gather(1, action_batch)
+    state_action_values = policy_net(state_batch).gather(1, action_batch.unsqueeze(1))
 
     # Compute V(s_{t+1}) for all next states.
     # Expected values of actions for non_final_next_states are computed based
@@ -208,22 +207,27 @@ else:
 for i_episode in range(num_episodes):
     # Initialize the environment and get its state
     state, info = env.reset()
-    state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
+    num_players = len(env.players)
+    state = torch.tensor(state, dtype=torch.float32, device=device)
     for t in count():
-        action = select_action(state)
-        observation, reward, terminated, truncated, _ = env.step(action.item())
-        reward = torch.tensor([reward], device=device)
+        raw_actions = [select_action(state[j]) for j in range(num_players)]
+        actions = [
+            convert_action_index_to_action(action.item(), n_columns=N_COLUMNS)
+            for action in raw_actions
+        ]
+        observation, rewards, terminated, truncated, _ = env.step(actions)
+        rewards = torch.tensor(rewards, device=device)
         done = terminated or truncated
 
+        # next state is none if the game is terminated
         if terminated:
             next_state = None
         else:
-            next_state = torch.tensor(
-                observation, dtype=torch.float32, device=device
-            ).unsqueeze(0)
+            next_state = torch.tensor(observation, dtype=torch.float32, device=device)
 
-        # Store the transition in memory
-        memory.push(state, action, next_state, reward)
+        # Store the transitions in memory
+        for j in range(num_players):
+            memory.push(state[j], raw_actions[j], next_state[j], rewards[j])
 
         # Move to the next state
         state = next_state
@@ -251,3 +255,7 @@ print("Complete")
 plot_durations(show_result=True)
 plt.ioff()
 plt.show()
+
+# %%
+
+# %%

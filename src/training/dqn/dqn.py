@@ -16,30 +16,30 @@ class DQN(nn.Module):
         n_hidden_conv_channels: int = 32,
     ):
         super(DQN, self).__init__()
-        layers = self._conv_block(input_channels, n_hidden_conv_channels)
+        self.hidden_layers = self._conv_block(input_channels, n_hidden_conv_channels)
 
         # hidden conv layers, input size stays the same
         for _ in range(n_hidden_conv_layers):
-            layers.extend(
+            self.hidden_layers.extend(
                 self._conv_block(n_hidden_conv_channels, n_hidden_conv_channels)
             )
+        self.hidden_layers = nn.Sequential(*self.hidden_layers)
 
         # collapse channels with 1x1 conv
-        layers.extend(
-            self._conv_block(n_hidden_conv_channels, 1, kernel_size=1, padding=0)
+        self.final_conv_block = nn.Sequential(
+            *self._conv_block(n_hidden_conv_channels, 1, kernel_size=1, padding=0)
         )
 
         # fully connected layer to predict over actions
-        layers.extend(
-            [
-                nn.Flatten(),
-                nn.Linear(n_hidden_conv_channels * n_rows * n_columns, n_actions),
-            ]
+        self.output_head = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(n_rows * n_columns, n_actions),
         )
-        self.layers = nn.Sequential(*layers)
 
     def forward(self, x):
-        return self.layers(x)
+        x = self.hidden_layers(x)
+        x = self.final_conv_block(x)
+        return self.output_head(x)
 
     def _conv_block(self, in_channels, out_channels, kernel_size=3, padding=1):
         return [
