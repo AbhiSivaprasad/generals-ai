@@ -1,4 +1,4 @@
-from typing import List
+from typing import Dict, List
 
 import gymnasium
 import numpy as np
@@ -7,7 +7,7 @@ from src.agents.random_agent import RandomAgent
 from src.environment.action import Action
 from src.environment.board_generator import generate_board_state
 from src.environment.game_master import GameMaster
-from src.training.input import convert_state_to_tensor, get_input_channel_dimension_size
+from src.training.input import convert_state_to_array, get_input_channel_dimension_size
 
 
 class GeneralsEnvironment(gymnasium.Env):
@@ -51,17 +51,18 @@ class GeneralsEnvironment(gymnasium.Env):
         self.game_master.step(actions)
 
         # return the new state, reward, terminal status, and info dict
-        observation = convert_state_to_tensor(
-            self.game_master.board, fog_of_war=self.use_fog_of_war
+        observation = convert_state_to_array(
+            self.game_master.board, len(self.players), fog_of_war=self.use_fog_of_war
         )
-        rewards = [self.game_master.board.get_player_score(i) for i in range(2)]
+        rewards = [
+            self.game_master.board.get_player_score(i) for i in range(len(self.players))
+        ]
         done = self.board.terminal_status() != -1
         info = {}
         return (observation, rewards, done, info)
 
-    def reset(self, seed=None):
+    def reset(self, seed=None, options: Dict = {}):
         super().reset(seed=seed)
-        self.board = self.game_master.reset(seed)
 
         # generate new board
         board = generate_board_state(
@@ -76,3 +77,8 @@ class GeneralsEnvironment(gymnasium.Env):
             logger=None,
             max_turns=self.max_turns,
         )
+        initial_state = convert_state_to_array(
+            self.game_master.board, len(self.players), self.use_fog_of_war
+        )
+        info = {}
+        return initial_state, info

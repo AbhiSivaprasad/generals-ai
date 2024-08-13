@@ -1,32 +1,33 @@
+import numpy as np
 import torch
 from src.environment.board import Board
 from src.environment.tile import Tile, TileType
 
 
-def convert_state_to_tensor(state: Board, n_players: int, fog_of_war: bool):
-    return torch.stack(
+def convert_state_to_array(state: Board, n_players: int, fog_of_war: bool):
+    return np.stack(
         [
-            convert_state_to_tensor_for_player(state, player_index, fog_of_war)
+            convert_state_to_array_for_player(state, player_index, fog_of_war)
             for player_index in range(n_players)
         ]
     )
 
 
-def convert_state_to_tensor_for_player(
+def convert_state_to_array_for_player(
     state: Board, player_index: int, fog_of_war: bool
 ):
-    state_tensor = torch.stack(
+    state_array = np.stack(
         [
-            convert_tile_to_tensor(tile, player_index, fog_of_war)
-            for row in enumerate(state.grid)
-            for tile in enumerate(row)
+            convert_tile_to_array(tile, player_index, fog_of_war)
+            for row in state.grid
+            for tile in row
         ]
     ).reshape(-1, state.num_rows, state.num_cols)
-    return state_tensor
+    return state_array
 
 
-def convert_tile_to_tensor(tile: Tile, player_index: int, fog_of_war: bool):
-    tile_state = torch.zeros(get_input_channel_dimension_size(fog_of_war))
+def convert_tile_to_array(tile: Tile, player_index: int, fog_of_war: bool):
+    tile_state = np.zeros(get_input_channel_dimension_size(fog_of_war), dtype=np.int32)
     has_vision = tile.player_visibilities[player_index] or not fog_of_war
 
     # indices 0, 1 represents player 0, 1
