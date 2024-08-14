@@ -34,7 +34,6 @@ class GameMaster:
         while self.board.terminal_status() == -1 and self.turn < self.max_turns:
             actions = [player.move(self.board) for player in self.players]
             self.step(actions)
-            self.turn += 1
 
         return self.board.terminal_status()
 
@@ -56,6 +55,7 @@ class GameMaster:
 
         # game logic to add troops to generals, cities, and land on specific ticks
         self.add_troops_to_board()
+        self.turn += 1
 
     def add_troops_to_board(self):
         """increment all troops on captured cities or generals"""

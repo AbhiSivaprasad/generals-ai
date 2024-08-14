@@ -23,6 +23,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from collections import namedtuple, deque
 from itertools import count
+from pathlib import Path
 
 # %%
 import torch
@@ -39,6 +40,7 @@ from src.training.input import (
     convert_action_index_to_action,
 )
 from src.training.dqn.replay_memory import ReplayMemory, Transition
+from src.environment.logger import Logger
 
 # %%
 env = GeneralsEnvironment(players=[RandomAgent(0), RandomAgent(0)])
@@ -207,9 +209,22 @@ def convert_agent_dict_to_tensor(agent_dict, dtype=torch.float32):
 
 
 # %%
+LOG_DIR = Path("resources/replays")
+
+# %%
+import json
+with open("/home/abhi/projects/generals-ai/resources/replays/0.json", "r") as f:
+    file = json.load(f)
+
+len(file["boardDiffs"])
+
+# %%
+
+# %%
 for i_episode in range(num_episodes):
+    logger = Logger()
     # Initialize the environment and get its state
-    state, info = env.reset()
+    state, info = env.reset(logger=logger)
     convert_agent_dict_to_tensor(state)
     num_players = len(env.unwrapped.players)
     for t in count():
@@ -259,6 +274,7 @@ for i_episode in range(num_episodes):
         if done:
             episode_durations.append(t + 1)
             plot_durations()
+            logger.write(LOG_DIR / f"{i_episode}.json")
             break
 
 # %%

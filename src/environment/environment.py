@@ -7,6 +7,7 @@ from src.agents.agent import Agent
 from src.environment.action import Action
 from src.environment.board_generator import generate_board_state
 from src.environment.game_master import GameMaster
+from src.environment.logger import Logger
 from src.training.input import (
     convert_action_index_to_action,
     convert_state_to_array,
@@ -56,7 +57,7 @@ class GeneralsEnvironment(ParallelEnv):
             for agent_name in self.agent_names
         }
 
-    def reset(self, seed=None, options=None):
+    def reset(self, seed=None, options=None, logger: Logger = None):
         self.n_step = 0
         board = generate_board_state(
             self.board_x_size,
@@ -67,7 +68,7 @@ class GeneralsEnvironment(ParallelEnv):
         self.game_master = GameMaster(
             board,
             players=self.players,
-            logger=None,
+            logger=logger,
             max_turns=self.max_turns,
         )
         self.previous_player_scores = {agent_name: 0 for agent_name in self.agent_names}
