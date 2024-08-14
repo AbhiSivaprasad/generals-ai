@@ -86,7 +86,7 @@ class Board:
 
         # check that destination tile is within bounds and not a mountain
         destination_tile = self._get_destination_tile(start_tile, action)
-        if destination_tile is None:
+        if destination_tile is None or destination_tile.type == TileType.MOUNTAIN:
             return False
 
         # check that player owns start tile

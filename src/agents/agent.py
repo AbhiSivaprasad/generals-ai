@@ -7,6 +7,7 @@ from src.environment.gamestate import GameState
 
 
 class Agent(ABC):
+    player_index: int
     
     def __init__(self, player_index) -> None:
         self.player_index = player_index

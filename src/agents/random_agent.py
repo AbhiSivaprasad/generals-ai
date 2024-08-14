@@ -1,16 +1,16 @@
 import numpy as np
 
 from src.agents.agent import Agent
-from src.environment.action import Action, Direction
+from src.environment.action import Action
 from src.environment.gamestate import GameState
 
 
 class RandomAgent(Agent):
     rng: np.random.Generator
     
-    def __init__(self, player_index, seed=0, *args, **kwargs):
-        self.reset(seed)
+    def __init__(self, player_index, seed, *args, **kwargs):
         super().__init__(player_index, *args, **kwargs)
+        self.reset(seed)
     
     def reset(self, seed):
         self.rng = np.random.default_rng(seed)

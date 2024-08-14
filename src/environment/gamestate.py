@@ -1,10 +1,54 @@
 from dataclasses import dataclass
-from typing import List
-from src.environment.board import Board
+from typing import List, Tuple
+from typing import Self
+from itertools import product as cartesian
 
+
+import numpy as np
+from src.environment.board import Board
+from src.environment.environment import MAX_SIZE
+from src.environment.tile import Tile, TileType
+
+ObsType = Tuple[int, np.ndarray] # turn, grid
 @dataclass
 class GameState:
     terminal_status: int = -1
     board: Board
     scores: List[int] # not functional / not in use yet
     turn: int
+    
+    def to_observation(self, player_index: int) -> ObsType:
+        state = self
+        # [army, 1-hot general, 1-hot city, 1-hot mountain, 1-hot in-bounds, 0/1 is_mine, 0/1 visible
+        obs = np.zeros((MAX_SIZE[0], MAX_SIZE[1], 7), dtype=np.float32)
+        board_r, board_c = len(state.board.grid), len(state.board.grid[0])
+        for r, c in cartesian(range(MAX_SIZE[0]), range(MAX_SIZE[1])):
+            if 0 <= r < board_r and 0 <= c < board_c:
+                tile = state.board.grid[r][c]
+                obs[r, c, 4] = 1
+                if tile.player_visibilities[player_index]:
+                    obs[r, c, 0] = tile.army
+                    obs[r, c, 1] = 1 if tile.type == TileType.GENERAL else 0
+                    obs[r, c, 2] = 1 if tile.type == TileType.CITY else 0
+                    obs[r, c, 3] = 1 if tile.type == TileType.MOUNTAIN else 0
+                    obs[r, c, 5] = tile.player_index
+                    obs[r, c, 6] = 1
+        return self.turn, obs
+    
+    @classmethod
+    def from_observation(cls, obs: ObsType, player_index: int) -> "GameState":
+        turn, grid = obs
+        board = Board(*grid.shape)
+        tile_grid = [[Tile(board, x, y) for x in range(grid.shape[1])] for y in range(grid.shape[0])]
+
+        # each tile vector is [army, 0/1 general, 0/1 city, 0/1 mountain, 0/1 in-bounds, 0/1 player_id, 0/1 visible]
+        for r in range(grid.shape[0]):
+            for c in range(grid.shape[1]):
+                tile = board.grid[r][c]
+                tile.army = grid[r, c, 0]
+                tile.type = TileType.GENERAL if grid[r, c, 1] else TileType.CITY if grid[r, c, 2] else TileType.MOUNTAIN if grid[r, c, 3] else TileType.NORMAL
+                tile.player_index = grid[r, c, 5]
+                tile.player_visibilities[player_index] = grid[r, c, 6]
+        board.set_grid(tile_grid)
+        
+        return cls(-1, board, [0, 0], turn)

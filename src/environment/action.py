@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Tuple
 
+import numpy as np
+
 
 class Direction(Enum):
     UP = 0
@@ -15,6 +17,20 @@ class Action:
     startx: int
     starty: int
     direction: Direction
+    
+    def to_space_sample(self, num_rows: int, num_col: int) -> int:
+        return np.ravel_multi_index((self.starty, self.startx, self.direction.value), (num_rows, num_col, 4)) + 1
+    
+    @classmethod
+    def from_space_sample(cls, sample: int, num_rows: int, num_col: int) -> "Action":
+        # 0 is None action
+        if sample == 0:
+            return None
+        # sample - 1 is the unraveled index
+        sample = sample - 1
+        y, x, dir = np.unravel_index(sample, (num_rows, num_col, 4))
+        direction = Direction(dir)
+        return cls(x, y, direction)
 
 
 def convert_direction_to_vector(direction: Direction) -> Tuple[int, int]:

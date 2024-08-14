@@ -5,7 +5,7 @@ from src.environment.tile import TileType
 from src.environment.action import Action
 from src.agents.agent import Agent
 
-from typing import Generator, List, Optional
+from typing import Any, Generator, Iterable, List, Optional
 
 
 class GameMaster:
@@ -26,7 +26,7 @@ class GameMaster:
             # log initial board configuration
             self.logger.init(self.state.board)
     
-    def step(self) -> Generator[GameState, None, None]:
+    def step(self) -> Generator[GameState, Any, Any]:
         assert len(self.players) == 2 and self.players[0] is not None and self.players[1] is not None, "Game must have 2 players."
         
         while self.state.board.terminal_status() == -1 and (self.max_turns is None or self.state.turn < self.max_turns):
