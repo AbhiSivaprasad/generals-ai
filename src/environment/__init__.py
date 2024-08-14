@@ -1,9 +1,8 @@
-from gymnasium.envs.registration import register
+from typing import Tuple
+from src.environment.action import Action
 
-from src.environment.environment import GeneralsEnvironment
+import numpy as np
 
-register(
-     id="generals-v0",
-     entry_point=GeneralsEnvironment,
-     max_episode_steps=1000,
-)
+MAX_SIZE = [15, 15]
+ActType = Action
+ObsType = Tuple[int, np.ndarray] # turn, grid

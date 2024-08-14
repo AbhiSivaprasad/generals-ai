@@ -2,7 +2,7 @@ from gymnasium import Space
 import numpy as np
 from tqdm import tqdm
 
-from typing import Dict, List, Optional
+from typing import List, Optional
 from src.agents.agent import Agent
 from src.agents.utils.agent_wrapper import AgentWrapper
 from src.environment.action import Action

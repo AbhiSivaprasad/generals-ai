@@ -1,21 +1,20 @@
 from dataclasses import dataclass
 from typing import List, Tuple
-from typing import Self
 from itertools import product as cartesian
 
 
 import numpy as np
+
+from src.environment import MAX_SIZE, ObsType
 from src.environment.board import Board
-from src.environment.environment import MAX_SIZE
 from src.environment.tile import Tile, TileType
 
-ObsType = Tuple[int, np.ndarray] # turn, grid
 @dataclass
 class GameState:
-    terminal_status: int = -1
     board: Board
     scores: List[int] # not functional / not in use yet
     turn: int
+    terminal_status: int = -1
     
     def to_observation(self, player_index: int) -> ObsType:
         state = self

@@ -11,14 +11,9 @@ from gymnasium.spaces import Space, \
 from src.agents.utils.gym_agent import GymAgent
 from src.environment import board_generator, game_master
 from src.agents.agent import Agent
-from src.environment.action import Action
 from src.environment.gamestate import ObsType
 from src.environment.logger import Logger
 
-
-MAX_SIZE = [15, 15]
-
-ActType = Action
 
 
 class GeneralsEnvironment(gym.Env):
@@ -101,4 +96,10 @@ class GeneralsEnvironment(gym.Env):
         return (new_obs, reward, terminated, False, {"opponent": self.opponent, "legal_move": legal_move, "game_state": self.game.state, "prev_state": self._prev_state})
 
             
-            
+from gymnasium.envs.registration import register
+
+register(
+     id="generals-v0",
+     entry_point=GeneralsEnvironment,
+     max_episode_steps=1000,
+)

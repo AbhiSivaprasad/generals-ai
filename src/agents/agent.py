@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from src.environment.action import Action
-from src.environment.board import Board
 from src.environment.gamestate import GameState
 
 
