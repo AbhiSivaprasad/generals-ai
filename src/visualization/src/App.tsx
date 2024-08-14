@@ -5,6 +5,10 @@ import "typeface-quicksand"
 import { useData } from './api/utils';
 import Replay from './replay';
 import { CellState, BoardState } from './types/globals';
+import { useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+
+
 
 /**
  * apply a move to a board state and return new board state
@@ -19,12 +23,23 @@ function patch(board: BoardState, diffs: CellState[]) {
     return board;
 }
 
-
 function App() {
+    return (
+        <Router>
+            <Routes>
+                <Route path="/replay/:replayId" element={<InnerApp/>} />
+            </Routes>
+        </Router>
+    );
+}
+
+
+function InnerApp() {
     const [playerIndex, setPlayerIndex] = useState<number | null>(null);
     const [boardStates, setBoardStates] = useState<any[]>([]);
+    const { replayId } = useParams<{ replayId: string }>();
 
-    const replayData = useData("/replay");
+    const replayData = useData(`/replay/${replayId}`);
 
     useEffect(() => {
         if(!replayData) return;
