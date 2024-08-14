@@ -41,15 +41,7 @@ from src.training.input import (
 from src.training.dqn.replay_memory import ReplayMemory, Transition
 
 # %%
-gym.register(
-    id="Generals-v0",
-    entry_point=GeneralsEnvironment,
-    nondeterministic=True,
-    kwargs={"players": [RandomAgent(0), RandomAgent(1)]},
-)
-
-# %%
-env = gym.make("Generals-v0")
+env = GeneralsEnvironment(players=[RandomAgent(0), RandomAgent(0)])
 
 # %%
 # set up matplotlib
@@ -77,7 +69,7 @@ N_ROWS = 3
 N_COLUMNS = 3
 FOG_OF_WAR = False
 INPUT_CHANNELS = get_input_channel_dimension_size(FOG_OF_WAR)
-N_ACTIONS = env.action_space.n
+N_ACTIONS = list(env.action_spaces.values())[0].n
 
 # %%
 # Get the number of state observations
@@ -112,7 +104,9 @@ def select_action(state):
             return policy_net(state).argmax(dim=1).squeeze()
     else:
         return torch.tensor(
-            [[env.action_space.sample()]], device=device, dtype=torch.long
+            [[list(env.action_spaces.values())[0].sample()]],
+            device=device,
+            dtype=torch.long,
         ).squeeze()
 
 
@@ -203,31 +197,48 @@ if torch.cuda.is_available() or torch.backends.mps.is_available():
 else:
     num_episodes = 50
 
+
+# %%
+def convert_agent_dict_to_tensor(agent_dict, dtype=torch.float32):
+    for agent_name in agent_dict.keys():
+        agent_dict[agent_name] = torch.tensor(
+            agent_dict[agent_name], dtype=dtype, device=device
+        )
+
+
 # %%
 for i_episode in range(num_episodes):
     # Initialize the environment and get its state
     state, info = env.reset()
-    num_players = len(env.players)
-    state = torch.tensor(state, dtype=torch.float32, device=device)
+    convert_agent_dict_to_tensor(state)
+    num_players = len(env.unwrapped.players)
     for t in count():
-        raw_actions = [select_action(state[j]) for j in range(num_players)]
-        actions = [
-            convert_action_index_to_action(action.item(), n_columns=N_COLUMNS)
-            for action in raw_actions
-        ]
+        actions = {
+            agent_name: select_action(state[agent_name]).item()
+            for agent_name in state.keys()
+        }
         observation, rewards, terminated, truncated, _ = env.step(actions)
-        rewards = torch.tensor(rewards, device=device)
+        convert_agent_dict_to_tensor(rewards)
+        convert_agent_dict_to_tensor(actions, dtype=torch.long)
+        terminated = list(terminated.values())[0]
+        truncated = list(truncated.values())[0]
         done = terminated or truncated
 
         # next state is none if the game is terminated
         if terminated:
-            next_state = None
+            next_state = {agent_name: None for agent_name in state.keys()}
         else:
-            next_state = torch.tensor(observation, dtype=torch.float32, device=device)
+            convert_agent_dict_to_tensor(observation)
+            next_state = observation
 
         # Store the transitions in memory
-        for j in range(num_players):
-            memory.push(state[j], raw_actions[j], next_state[j], rewards[j])
+        for agent_name in state.keys():
+            memory.push(
+                state[agent_name],
+                actions[agent_name],
+                next_state[agent_name],
+                rewards[agent_name],
+            )
 
         # Move to the next state
         state = next_state
@@ -251,11 +262,10 @@ for i_episode in range(num_episodes):
             break
 
 # %%
+episode_durations
+
+# %%
 print("Complete")
 plot_durations(show_result=True)
 plt.ioff()
 plt.show()
-
-# %%
-
-# %%
