@@ -1,17 +1,21 @@
+from pettingzoo import ParallelEnv
+from gymnasium import spaces
+import numpy as np
 from typing import Dict, List
 
-import gymnasium
-import numpy as np
 from src.agents.agent import Agent
-from src.agents.random_agent import RandomAgent
 from src.environment.action import Action
 from src.environment.board_generator import generate_board_state
 from src.environment.game_master import GameMaster
-from src.training.input import convert_state_to_array, get_input_channel_dimension_size
+from src.training.input import (
+    convert_action_index_to_action,
+    convert_state_to_array,
+    get_input_channel_dimension_size,
+)
 
 
-class GeneralsEnvironment(gymnasium.Env):
-    game_master: GameMaster
+class GeneralsEnvironment(ParallelEnv):
+    metadata = {"name": "generals_v0"}
 
     def __init__(
         self,
@@ -19,60 +23,46 @@ class GeneralsEnvironment(gymnasium.Env):
         max_turns: int = 1000,
         board_x_size: int = 3,
         board_y_size: int = 3,
-        mountain_probabilitiy: float = 0.0,
-        city_probabilitiy: float = 0.0,
+        mountain_probability: float = 0.0,
+        city_probability: float = 0.0,
         use_fog_of_war: bool = False,
-    ) -> None:
-        super().__init__()
+    ):
         self.players = players
+        self.agent_names = [f"player_{i}" for i in range(len(self.players))]
         self.max_turns = max_turns
         self.board_x_size = board_x_size
         self.board_y_size = board_y_size
-        self.mountain_probabilitiy = mountain_probabilitiy
-        self.city_probabilitiy = city_probabilitiy
+        self.mountain_probability = mountain_probability
+        self.city_probability = city_probability
         self.use_fog_of_war = use_fog_of_war
         self.n_step = 0
 
-        # spaces
-        self.action_space = gymnasium.spaces.Discrete(board_x_size * board_y_size * 4)
-        self.observation_space = gymnasium.spaces.Box(
-            low=0,
-            high=np.inf,
-            shape=(
-                len(self.players),
-                get_input_channel_dimension_size(self.use_fog_of_war),
-                board_x_size,
-                board_y_size,
-            ),
-            dtype=np.int32,
-        )
+        # Define action and observation spaces
+        self.action_spaces = {
+            agent_name: spaces.Discrete(board_x_size * board_y_size * 4)
+            for agent_name in self.agent_names
+        }
+        self.observation_spaces = {
+            agent_name: spaces.Box(
+                low=0,
+                high=np.inf,
+                shape=(
+                    get_input_channel_dimension_size(self.use_fog_of_war),
+                    board_x_size,
+                    board_y_size,
+                ),
+                dtype=np.int32,
+            )
+            for agent_name in self.agent_names
+        }
 
-    def step(self, actions: List[Action]):
-        # execute one tick of the game
-        self.game_master.step(actions)
-        self.n_step += 1
-
-        # return the new state, reward, terminal status, and info dict
-        observation = convert_state_to_array(
-            self.game_master.board, len(self.players), fog_of_war=self.use_fog_of_war
-        )
-        rewards = [
-            self.game_master.board.get_player_score(i) for i in range(len(self.players))
-        ]
-        terminated = self.game_master.board.terminal_status() != -1
-        truncated = self.n_step >= self.max_turns
-        info = {}
-        return (observation, rewards, terminated, truncated, info)
-
-    def reset(self, seed=None, options: Dict = {}):
-        super().reset(seed=seed)
-
-        # generate new board
+    def reset(self, seed=None, options=None):
+        self.n_step = 0
         board = generate_board_state(
             self.board_x_size,
             self.board_y_size,
-            mountain_probability=self.mountain_probabilitiy,
-            city_probability=self.city_probabilitiy,
+            mountain_probability=self.mountain_probability,
+            city_probability=self.city_probability,
         )
         self.game_master = GameMaster(
             board,
@@ -80,8 +70,63 @@ class GeneralsEnvironment(gymnasium.Env):
             logger=None,
             max_turns=self.max_turns,
         )
-        initial_state = convert_state_to_array(
-            self.game_master.board, len(self.players), self.use_fog_of_war
-        )
-        info = {}
-        return initial_state, info
+        self.previous_player_scores = {agent_name: 0 for agent_name in self.agent_names}
+
+        observations = self._get_observations()
+        infos = {agent_name: {} for agent_name in self.agent_names}
+        return observations, infos
+
+    def step(self, actions):
+        # Convert actions to the format expected by game_master
+        game_actions = [
+            convert_action_index_to_action(actions[agent_name], self.board_x_size)
+            for agent_name in self.agent_names
+        ]
+
+        # Execute one tick of the game
+        self.game_master.step(game_actions)
+        self.n_step += 1
+
+        observations = self._get_observations()
+        rewards = self._get_rewards()
+        terminations = self._get_terminations()
+        truncations = self._get_truncations()
+        infos = {agent_name: {} for agent_name in self.agent_names}
+        return observations, rewards, terminations, truncations, infos
+
+    def _get_observations(self):
+        return {
+            agent_name: convert_state_to_array(
+                self.game_master.board,
+                len(self.players),
+                fog_of_war=self.use_fog_of_war,
+            )[i]
+            for i, agent_name in enumerate(self.agent_names)
+        }
+
+    def _get_rewards(self):
+        player_scores = {
+            agent_name: self.game_master.board.get_player_score(i)
+            for i, agent_name in enumerate(self.agent_names)
+        }
+        rewards = {
+            agent_name: player_scores[agent_name]
+            - self.previous_player_scores[agent_name]
+            for agent_name in self.agent_names
+        }
+        self.previous_player_scores = player_scores
+        return rewards
+
+    def _get_terminations(self):
+        game_over = self.game_master.board.terminal_status() != -1
+        return {agent_name: game_over for agent_name in self.agent_names}
+
+    def _get_truncations(self):
+        truncated = self.n_step >= self.max_turns
+        return {agent_name: truncated for agent_name in self.agent_names}
+
+    def render(self):
+        pass
+
+    def close(self):
+        pass
