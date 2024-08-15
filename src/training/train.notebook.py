@@ -16,6 +16,7 @@
 # ---
 
 # %%
+import wandb
 import gymnasium as gym
 import math
 import random
@@ -65,17 +66,36 @@ TAU = 0.005  # update rate of target network
 LR = 1e-4
 
 # %%
-N_ROWS = 3
-N_COLUMNS = 3
+N_ROWS = 2
+N_COLUMNS = 2
 FOG_OF_WAR = False
 INPUT_CHANNELS = get_input_channel_dimension_size(FOG_OF_WAR)
+N_HIDDEN_CONV_LAYERS = 0
+N_HIDDEN_CONV_CHANNELS = 32
+KERNEL_SIZE = 2
 
 # %%
 N_ACTIONS = 4 * N_ROWS * N_COLUMNS
 
 # %%
-policy_net = DQN(N_ROWS, N_COLUMNS, INPUT_CHANNELS, N_ACTIONS).to(device)
-target_net = DQN(N_ROWS, N_COLUMNS, INPUT_CHANNELS, N_ACTIONS).to(device)
+policy_net = DQN(
+    N_ROWS,
+    N_COLUMNS,
+    KERNEL_SIZE,
+    INPUT_CHANNELS,
+    N_ACTIONS,
+    N_HIDDEN_CONV_LAYERS,
+    N_HIDDEN_CONV_CHANNELS,
+).to(device)
+target_net = DQN(
+    N_ROWS,
+    N_COLUMNS,
+    KERNEL_SIZE,
+    INPUT_CHANNELS,
+    N_ACTIONS,
+    N_HIDDEN_CONV_LAYERS,
+    N_HIDDEN_CONV_CHANNELS,
+).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 env = GeneralsEnvironment(
     players=[
@@ -91,7 +111,28 @@ env = GeneralsEnvironment(
             eps_end=EPS_END,
             eps_decay=EPS_DECAY,
         ),
-    ]
+    ],
+    board_x_size=N_COLUMNS,
+    board_y_size=N_ROWS,
+)
+
+# %%
+run = wandb.init(
+    project="generals",
+    config={
+        "learning_rate": LR,
+        "n_rows": N_ROWS,
+        "n_columns": N_COLUMNS,
+        "tau": TAU,
+        "gamma": GAMMA,
+        "batch_size": BATCH_SIZE,
+        "eps_start": EPS_START,
+        "eps_end": EPS_END,
+        "eps_decay": EPS_DECAY,
+        "n_hidden_conv_layers": N_HIDDEN_CONV_LAYERS,
+        "n_hidden_conv_channels": N_HIDDEN_CONV_CHANNELS,
+        "kernel_size": KERNEL_SIZE,
+    },
 )
 
 # %%
@@ -107,36 +148,32 @@ memory = ReplayMemory(10000)
 # %%
 steps_done = 0
 
-# %%
-episode_durations = []
-
 
 # %%
-def plot_durations(show_result=False):
-    plt.figure(1)
-    durations_t = torch.tensor(episode_durations, dtype=torch.float)
-    if show_result:
-        plt.title("Result")
-    else:
-        plt.clf()
-        plt.title("Training...")
-    plt.xlabel("Episode")
-    plt.ylabel("Duration")
-    plt.plot(durations_t.numpy())
-    # Take 100 episode averages and plot them too
-    if len(durations_t) >= 100:
-        means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
-        means = torch.cat((torch.zeros(99), means))
-        plt.plot(means.numpy())
+# def plot_durations(show_result=False):
+#     plt.figure(1)
+#     durations_t = torch.tensor(episode_durations, dtype=torch.float)
+#     if show_result:
+#         plt.title("Result")
+#     else:
+#         plt.clf()
+#         plt.title("Training...")
+#     plt.xlabel("Episode")
+#     plt.ylabel("Duration")
+#     plt.plot(durations_t.numpy())
+#     # Take 100 episode averages and plot them too
+#     if len(durations_t) >= 100:
+#         means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
+#         means = torch.cat((torch.zeros(99), means))
+#         plt.plot(means.numpy())
 
-    plt.pause(0.001)  # pause a bit so that plots are updated
-    if is_ipython:
-        if not show_result:
-            display.display(plt.gcf())
-            display.clear_output(wait=True)
-        else:
-            display.display(plt.gcf())
-
+#     plt.pause(0.001)  # pause a bit so that plots are updated
+#     if is_ipython:
+#         if not show_result:
+#             display.display(plt.gcf())
+#             display.clear_output(wait=True)
+#         else:
+#             display.display(plt.gcf())
 
 # %%
 def optimize_model():
@@ -187,12 +224,7 @@ def optimize_model():
     torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
     optimizer.step()
 
-
-# %%
-if torch.cuda.is_available() or torch.backends.mps.is_available():
-    num_episodes = 600
-else:
-    num_episodes = 50
+    return loss.detach().item()
 
 
 # %%
@@ -208,14 +240,8 @@ LOG_DIR = Path("resources/replays")
 LOG_DIR.mkdir(exist_ok=True, parents=True)
 
 # %%
-import json
-
-# with open("/home/abhi/projects/generals-ai/resources/replays/0.json", "r") as f:
-#     file = json.load(f)
-
-# len(file["boardDiffs"])
-
-# %%
+num_episodes = 1000
+global_step = 0
 for i_episode in range(num_episodes):
     logger = Logger()
     # Initialize the environment and get its state
@@ -225,9 +251,11 @@ for i_episode in range(num_episodes):
     for t in count():
         actions = {
             agent_name: agent.move(state[agent_name], env).item()
-            for agent_name, agent in zip(env.unwrapped.agent_names, env.unwrapped.players)
+            for agent_name, agent in zip(
+                env.unwrapped.agent_name_by_player_index, env.unwrapped.players
+            )
         }
-        observation, rewards, terminated, truncated, _ = env.step(actions)
+        observation, rewards, terminated, truncated, info = env.step(actions)
         convert_agent_dict_to_tensor(rewards)
         convert_agent_dict_to_tensor(actions, dtype=torch.long)
         truncated = list(truncated.values())[0]
@@ -254,7 +282,11 @@ for i_episode in range(num_episodes):
         state = next_state
 
         # Perform one step of the optimization (on the policy network)
-        optimize_model()
+        loss = optimize_model()
+        legal_move_rate = list(info.values())[0]["is_game_action_legal"]
+        wandb.log(
+            {"step": global_step, "loss": loss, "legal_move_rate": legal_move_rate}
+        )
 
         # Soft update of the target network's weights
         # θ′ ← τ θ + (1 −τ )θ′
@@ -267,13 +299,11 @@ for i_episode in range(num_episodes):
         target_net.load_state_dict(target_net_state_dict)
 
         if done:
-            episode_durations.append(t + 1)
-            plot_durations()
+            wandb.log({"step": global_step, "duration": t})
             logger.write(LOG_DIR / f"{i_episode}.json")
             break
 
-# %%
-episode_durations
+        global_step += 1
 
 # %%
 print("Complete")

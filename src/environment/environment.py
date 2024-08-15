@@ -113,7 +113,7 @@ class GeneralsEnvironment(ParallelEnv):
         rewards = self._get_rewards()
         terminations = self._get_terminations()
         truncations = self._get_truncations()
-        infos = self._get_infos(are_game_actions_legal)
+        infos = self._get_infos(is_game_action_legal=are_game_actions_legal)
         return observations, rewards, terminations, truncations, infos
 
     def _get_observations(self):
