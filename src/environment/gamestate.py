@@ -30,7 +30,7 @@ class GameState:
                     obs[r, c, 1] = 1 if tile.type == TileType.GENERAL else 0
                     obs[r, c, 2] = 1 if tile.type == TileType.CITY else 0
                     obs[r, c, 3] = 1 if tile.type == TileType.MOUNTAIN else 0
-                    obs[r, c, 5] = tile.player_index
+                    obs[r, c, 5] = (tile.player_index == player_index)
                     obs[r, c, 6] = 1
         return self.turn, obs
     
@@ -47,7 +47,11 @@ class GameState:
                 tile = board.grid[r][c]
                 tile.army = int(grid[r, c, 0])
                 tile.type = TileType.GENERAL if grid[r, c, 1] else TileType.CITY if grid[r, c, 2] else TileType.MOUNTAIN if grid[r, c, 3] else TileType.NORMAL
-                tile.player_index = int(grid[r, c, 5])
+                tile.player_index = player_index if bool(grid[r, c, 5]) else 1 - player_index
+                if tile.type == TileType.GENERAL:
+                    board.generals[tile.player_index] = tile
+                if tile.type == TileType.CITY:
+                    board.cities[tile.player_index].append(tile)
                 tile.player_visibilities[player_index] = bool(grid[r, c, 6])
         
         return cls(board, [], turn)

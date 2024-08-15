@@ -37,7 +37,7 @@ class RayReplayBuffer(ReplayBuffer):
             "s1": [sample[3] for sample in samples],
             "d": [sample[4] for sample in samples],
         }
-        self.ray_buffer.add_batch(sample_dict)
+        self.ray_buffer.add(ray_replay_buffer.SampleBatch(sample_dict))
 
     def sample(self, size: int) -> List[Experience]:
         batch: ray_replay_buffer.SampleBatch = self.ray_buffer.sample(size)

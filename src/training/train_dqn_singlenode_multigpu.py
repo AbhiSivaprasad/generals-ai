@@ -15,7 +15,6 @@ from tqdm import trange
 import random
 import sys
 
-
 from src.agents.agent import Agent
 from src.agents.human_exe_agent import HumanExeAgent
 from src.agents.q_greedy_agent import DQNAgent
@@ -27,6 +26,7 @@ from src.utils.replay_buffer import RayReplayBuffer, Experience
 
 from src.agents.utils.gym_agent import GymAgent
 import argparse
+
 
 class DQNTrainingConfig(object):
     # agent / env
@@ -109,7 +109,7 @@ class EnvRunner:
     env: GeneralsEnvironment
     
     def _handle_observation(self, experience: Experience):
-        self.buffer.add.remote(experience)
+        self.buffer.add.remote([experience])
     
     def __init__(self, config: DQNTrainingConfig, agent: Dict | Agent, opponent: Dict | Agent, server: ray.ObjectRef, buffer: ray.ObjectRef):
         self.config = config
@@ -127,7 +127,7 @@ class EnvRunner:
         rng = np.random.default_rng(self.config.seed)
         self.env.reset(seed=self.config.seed)
         while True:
-            agent_seed = rng.integers(-2**29, 2**29)
+            agent_seed = rng.integers(0, 2**29)
             if isinstance(self.agent.unwrapped, DQNAgent):
                 dqn_agent: DQNAgent = self.agent.unwrapped
                 model = dqn_agent.model.cuda()
@@ -186,6 +186,8 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
             }, step=step)
 
 if __name__ == "__main__":
+    ray.init()
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_file", type=str, required=False, help="Path to a training config YAML file.")
     args = parser.parse_args()
@@ -200,10 +202,8 @@ if __name__ == "__main__":
     random.seed(config.seed)
     torch.use_deterministic_algorithms(True)
     
-    ray.init()
-    
     print("Starting ray cluster...")
-    time.sleep(10)
+    time.sleep(5)
     
     buffer = RayReplayBuffer.remote(config.memory_capacity)
     
@@ -217,8 +217,8 @@ if __name__ == "__main__":
     configs = [copy.deepcopy(config) for _ in range(1000)]
     for i, c in enumerate(configs):
         c.seed = 2**(i % 29) + 2 * i + 1
-    env_runners = [EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 1)]
-    env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 1)])
+    env_runners = [EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 1)]
+    # env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 1)])
     # env_runners.extend([EnvRunner.remote(config=c, agent=DQNAgent(0, tgt_net, "cpu"), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 1)])
 
     for runner in env_runners:
