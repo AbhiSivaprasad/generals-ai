@@ -10,18 +10,30 @@ class DQN(nn.Module):
         self,
         n_rows: int,
         n_columns: int,
+        kernel_size: int,
         input_channels: int,
         n_actions: int,
         n_hidden_conv_layers: int = 1,
         n_hidden_conv_channels: int = 32,
+        hidden_conv_padding: int = 1,
     ):
         super(DQN, self).__init__()
-        self.hidden_layers = self._conv_block(input_channels, n_hidden_conv_channels)
+        self.hidden_layers = self._conv_block(
+            input_channels, n_hidden_conv_channels, kernel_size, hidden_conv_padding
+        )
+        # first conv layer may change input size
+        n_output_columns = n_columns + 2 * hidden_conv_padding - kernel_size + 1
+        n_output_rows = n_rows + 2 * hidden_conv_padding - kernel_size + 1
 
         # hidden conv layers, input size stays the same
         for _ in range(n_hidden_conv_layers):
             self.hidden_layers.extend(
-                self._conv_block(n_hidden_conv_channels, n_hidden_conv_channels)
+                self._conv_block(
+                    n_hidden_conv_channels,
+                    n_hidden_conv_channels,
+                    kernel_size,
+                    hidden_conv_padding,
+                )
             )
         self.hidden_layers = nn.Sequential(*self.hidden_layers)
 
@@ -33,7 +45,7 @@ class DQN(nn.Module):
         # fully connected layer to predict over actions
         self.output_head = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(n_rows * n_columns, n_actions),
+            nn.Linear(n_output_rows * n_output_columns, n_actions),
         )
 
     def forward(self, x):
