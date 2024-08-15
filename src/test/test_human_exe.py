@@ -18,7 +18,7 @@ if __name__ == "__main__":
     
     logger = Logger()
     game_master = GameMaster(
-        board, players=[HumanExeAgent(0), RandomAgent(1)], logger=logger, max_turns=500
+        board, players=[HumanExeAgent(0), RandomAgent(1, 0)], logger=logger, max_turns=500
     )
     game_master.play()
 
