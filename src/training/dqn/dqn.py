@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Tuple
 import torch
 from src.environment.board import Board
@@ -18,6 +19,17 @@ class DQN(nn.Module):
         hidden_conv_padding: int = 1,
     ):
         super(DQN, self).__init__()
+        # store model architecture
+        self.n_rows = n_rows
+        self.n_columns = n_columns
+        self.kernel_size = kernel_size
+        self.input_channels = input_channels
+        self.n_actions = n_actions
+        self.n_hidden_conv_layers = n_hidden_conv_layers
+        self.n_hidden_conv_channels = n_hidden_conv_channels
+        self.hidden_conv_padding = hidden_conv_padding
+
+        # hidden conv layers
         self.hidden_layers = self._conv_block(
             input_channels, n_hidden_conv_channels, kernel_size, hidden_conv_padding
         )
@@ -60,3 +72,36 @@ class DQN(nn.Module):
             ),
             nn.ReLU(),
         ]
+
+    def save_checkpoint(self, checkpoint_dir: Path, step: int):
+        checkpoint_dir.mkdir(exist_ok=True, parents=True)
+        checkpoint_path = checkpoint_dir / f"checkpoint_{step}.pth"
+
+        checkpoint = {
+            "step": step,
+            "model_state_dict": self.state_dict(),
+            "model_architecture": {
+                "n_rows": self.n_rows,
+                "n_columns": self.n_columns,
+                "kernel_size": self.kernel_size,
+                "input_channels": self.input_channels,
+                "n_actions": self.n_actions,
+                "n_hidden_conv_layers": self.n_hidden_conv_layers,
+                "n_hidden_conv_channels": self.n_hidden_conv_channels,
+                "hidden_conv_padding": self.hidden_conv_padding,
+            },
+        }
+        torch.save(checkpoint, checkpoint_path)
+        return checkpoint_path
+
+    @classmethod
+    def load_checkpoint(cls, checkpoint_path: Path, device="cpu"):
+        if not checkpoint_path.exists():
+            raise FileNotFoundError(f"No checkpoint found at {checkpoint_path}")
+
+        checkpoint = torch.load(checkpoint_path, map_location=device)
+        architecture = checkpoint["model_architecture"]
+        model = cls(**architecture)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        model.to(device)
+        return model
