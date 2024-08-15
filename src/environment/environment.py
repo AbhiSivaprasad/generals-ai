@@ -27,6 +27,7 @@ class GeneralsEnvironment(ParallelEnv):
         mountain_probability: float = 0.0,
         city_probability: float = 0.0,
         use_fog_of_war: bool = False,
+        auxiliary_reward_weight: float = 0.01,
     ):
         self.players = players
         self.agent_names = [f"player_{i}" for i in range(len(self.players))]
@@ -117,13 +118,35 @@ class GeneralsEnvironment(ParallelEnv):
             agent_name: self.game_master.board.get_player_score(i)
             for i, agent_name in enumerate(self.agent_names)
         }
-        rewards = {
+        player_score_changes = {
             agent_name: player_scores[agent_name]
             - self.previous_player_scores[agent_name]
             for agent_name in self.agent_names
         }
+        total_player_score_changes = sum(player_score_changes.values())
+        auxiliary_rewards = {
+            agent_name: 2 * player_score_change - total_player_score_changes
+            for agent_name, player_score_change in player_score_changes.items()
+        }
+
+        main_rewards = self._get_main_rewards()
+        total_rewards = {
+            agent_name: main_rewards[agent_name]
+            + self.auxiliary_reward_weight * auxiliary_rewards[agent_name]
+            for agent_name in self.agent_names
+        }
         self.previous_player_scores = player_scores
-        return rewards
+        return total_rewards
+
+    def _get_main_rewards(self):
+        winning_player_index = self.game_master.board.terminal_status()
+        main_rewards = {}
+        for i, agent_name in enumerate(self.agent_names):
+            if winning_player_index == -1:
+                main_rewards[agent_name] = 0
+            else:
+                main_rewards[agent_name] = 1 if i == winning_player_index else -1
+        return main_rewards
 
     def _get_terminations(self):
         game_over = self.game_master.board.terminal_status() != -1
