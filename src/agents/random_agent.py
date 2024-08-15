@@ -12,7 +12,7 @@ class RandomAgent(Agent):
         super().__init__(player_index, *args, **kwargs)
         self.reset(seed)
     
-    def reset(self, seed):
+    def reset(self, seed, *args, **kwargs) -> None:
         self.rng = np.random.default_rng(seed)
         
     def move(self, gamestate: GameState) -> Action:

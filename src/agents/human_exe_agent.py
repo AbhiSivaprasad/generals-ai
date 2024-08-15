@@ -97,8 +97,9 @@ class HumanExeAgent(Agent):
         self.humanexe = HumanExeBot()
         super().__init__(player_index, *args, **kwargs)
     
-    def reset(self):
+    def reset(self, *args, **kwargs) -> None:
         self.humanexe = HumanExeBot()
+        self.exemap = None
         
     def move(self, state: GameState) -> Optional[Action]:
         board = state.board

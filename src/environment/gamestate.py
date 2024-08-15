@@ -37,17 +37,17 @@ class GameState:
     @classmethod
     def from_observation(cls, obs: ObsType, player_index: int) -> "GameState":
         turn, grid = obs
-        board = Board(*grid.shape)
+        board = Board(grid.shape[0], grid.shape[1])
         tile_grid = [[Tile(board, x, y) for x in range(grid.shape[1])] for y in range(grid.shape[0])]
-
+        board.set_grid(tile_grid)
+        
         # each tile vector is [army, 0/1 general, 0/1 city, 0/1 mountain, 0/1 in-bounds, 0/1 player_id, 0/1 visible]
         for r in range(grid.shape[0]):
             for c in range(grid.shape[1]):
                 tile = board.grid[r][c]
-                tile.army = grid[r, c, 0]
+                tile.army = int(grid[r, c, 0])
                 tile.type = TileType.GENERAL if grid[r, c, 1] else TileType.CITY if grid[r, c, 2] else TileType.MOUNTAIN if grid[r, c, 3] else TileType.NORMAL
-                tile.player_index = grid[r, c, 5]
-                tile.player_visibilities[player_index] = grid[r, c, 6]
-        board.set_grid(tile_grid)
+                tile.player_index = int(grid[r, c, 5])
+                tile.player_visibilities[player_index] = bool(grid[r, c, 6])
         
-        return cls(-1, board, [0, 0], turn)
+        return cls(board, [], turn)

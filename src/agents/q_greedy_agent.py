@@ -5,8 +5,8 @@ import torch
 from src.agents.agent import Agent
 from src.agents.utils.observation_receiver import ObservationReceivingInterface
 from src.environment.action import Action
-from src.environment.environment import ActType
-from src.environment.gamestate import GameState, ObsType
+from src.environment import ActType, ObsType
+from src.environment.gamestate import GameState
 from src.utils.replay_buffer import Experience, ReplayBuffer
 
 class QGreedyAgent(Agent):
@@ -19,6 +19,9 @@ class QGreedyAgent(Agent):
         q_values = self.q_function(observation)
         best_action, q_value = max(q_values, key=lambda x: x[1])
         return best_action
+    
+    def reset(self, *args, **kwargs) -> None:
+        return super().reset(*args, **kwargs)
     
 class QGreedyLearningAgent(QGreedyAgent, ObservationReceivingInterface):
     def __init__(

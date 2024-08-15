@@ -9,10 +9,10 @@ from gymnasium.spaces import Space, \
     Box as BoxSpace
     
 from src.agents.utils.gym_agent import GymAgent
-from src.environment import board_generator, game_master
+from src.environment import MAX_SIZE, board_generator, game_master
 from src.agents.agent import Agent
-from src.environment.gamestate import ObsType
 from src.environment.logger import Logger
+from src.environment import ObsType, ActType
 
 
 
@@ -30,22 +30,28 @@ class GeneralsEnvironment(gym.Env):
     
     def __init__(
         self, 
-        num_rows: int,
-        num_cols: int,
+        n_rows: int,
+        n_cols: int,
         mountain_probability: float = 0,
         city_probability: float = 0,
         min_ratio_of_generals_distance_to_board_side: float = 2 / 3,
         seed: int = 0,
+        agent: Optional[Agent] = None,
+        opponent: Optional[Agent] = None
     ):
         super().__init__()
         
         self.action_space = DiscreteSpace(MAX_SIZE[0] * MAX_SIZE[1] * 4 + 1) # 15 x 15 x 4 + 1 (none action)
-        self.observation_space = TupleSpace(DiscreteSpace(MAX_SIZE[0]), DiscreteSpace(MAX_SIZE[1]), BoxSpace(low=0, dtype=int), DiscreteSpace(4), MultiBinarySpace(2)) \
+        self.observation_space = DiscreteSpace(1) # placeholder
+        # self.observation_space = TupleSpace(DiscreteSpace(MAX_SIZE[0]), DiscreteSpace(MAX_SIZE[1]), BoxSpace(low=0, dtype=int), DiscreteSpace(4), MultiBinarySpace(2)) \
             # [army, 1-hot general, 1-hot city, 1-hot mountain, 1-hot in-bounds, 0/1 is_mine, 0/1 visible]
         
-        self.num_rows, self.num_cols = num_rows, num_cols
+        self.num_rows, self.num_cols = n_rows, n_cols
         self.mountain_probability, self.city_probability = mountain_probability, city_probability
         self.min_ratio_of_generals_distance_to_board_side = min_ratio_of_generals_distance_to_board_side
+        
+        self.agent = GymAgent(env=self) if agent is None else GymAgent(agent=agent, env=self)
+        self.opponent = opponent
                 
         self.reset(seed=seed)
     
@@ -55,10 +61,10 @@ class GeneralsEnvironment(gym.Env):
         '''
         super().reset(seed=seed, options=options)
         
-        self.agent = GymAgent(env=self) if options["agent"] is None else GymAgent(agent=options["agent"], env=self)
-        self.opponent = options["opponent"]
-        
         assert self.opponent is not None and isinstance(self.opponent, Agent), "Generals env requires `opponent` option to environment!"
+        
+        self.agent.reset(seed=seed)
+        self.opponent.reset(seed=seed)
         
         board = board_generator.generate_board_state(
             self.num_rows, 
@@ -68,10 +74,9 @@ class GeneralsEnvironment(gym.Env):
             self.min_ratio_of_generals_distance_to_board_side,
             self.np_random
         )
-        
         self.game = game_master.GameMaster(board, [self.agent, self.opponent], logger=Logger())
         
-        return self.game.state.to_observation(), {}
+        return self.game.state.to_observation(self.agent.player_index), {}
     
     def step(self, action: ActType) -> Tuple[ObsType, float, bool, bool, dict]:
         '''
@@ -85,7 +90,7 @@ class GeneralsEnvironment(gym.Env):
         legal_move = self.game.state.board.is_action_valid(action, self.agent.player_index)
         reward += (1 - legal_move) * -1.0 # penalize illegal moves / invalid actions
         new_game_state = self.game.step()
-        new_obs = new_game_state.to_observation(new_game_state)
+        new_obs = new_game_state.to_observation(self.agent.player_index)
 
         terminated = self.game.state.board.terminal_status() > -1
         if terminated:

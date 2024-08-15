@@ -1,8 +1,7 @@
 from collections import deque
 from typing import List, Optional, Set
-from src.environment.action import Action, convert_direction_to_vector
-from src.environment.tile import Tile, TileType
-from src.environment.action import Action, Direction
+from src.environment.action import Action, Direction, convert_direction_to_vector
+from src.environment.tile import Tile, TileType 
 
 class Board:
     """

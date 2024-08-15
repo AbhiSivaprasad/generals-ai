@@ -8,7 +8,7 @@ from src.environment.gamestate import GameState
 class Agent(ABC):
     player_index: int
     
-    def __init__(self, player_index) -> None:
+    def __init__(self, player_index, *args, **kwargs) -> None:
         self.player_index = player_index
 
     @abstractmethod
@@ -19,7 +19,7 @@ class Agent(ABC):
         pass
 
     @abstractmethod
-    def reset(self) -> None:
+    def reset(self, *args, **kwargs) -> None:
         """
         Reset method. Good place to reset random seeds, agentstate variables, etc.
         """

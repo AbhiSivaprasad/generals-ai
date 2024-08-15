@@ -7,7 +7,7 @@ from src.environment.gamestate import ObsType
 from src.utils.replay_buffer import Experience
 
 
-class ObservationReceivingInterface(Agent):
+class ObservationReceivingInterface:
     @abstractmethod
     def observe(self, experience: Experience) -> None:
         pass
@@ -19,6 +19,5 @@ class ObservationReceiving(AgentWrapper, ObservationReceivingInterface):
         super().__init__(agent, *args, **kwargs)
         self.handler = observation_handler
         
-    @abstractmethod
     def observe(self, experience: Experience) -> None:
         self.handler(experience)

@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, Union, List
+from typing import Tuple, List
 
 import ray
 
-from src.environment.environment import ActType
-from src.environment.gamestate import ObsType
+from src.environment import ObsType, ActType
 
 from ray.rllib.utils.replay_buffers import replay_buffer as ray_replay_buffer
 

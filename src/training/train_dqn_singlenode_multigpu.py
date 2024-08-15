@@ -13,46 +13,57 @@ import yaml
 import gc
 from tqdm import trange
 import random
+import sys
+
 
 from src.agents.agent import Agent
 from src.agents.human_exe_agent import HumanExeAgent
 from src.agents.q_greedy_agent import DQNAgent
+from src.agents.random_agent import RandomAgent
 from src.agents.utils.observation_receiver import ObservationReceiving
+from src.environment.environment import GeneralsEnvironment
 from src.models.dqn_cnn import DQN
 from src.utils.replay_buffer import RayReplayBuffer, Experience
 
 from src.agents.utils.gym_agent import GymAgent
-from src.environment.environment import GeneralsEnvironment
-
-from math import prod as product
-
-ray.init()
-
+import argparse
 
 class DQNTrainingConfig(object):
+    # agent / env
+    seed: int = None
+    num_actions: int = None
+    input_channels: int = None
+    n_rows: int = None
+    n_cols: int = None
+    
+    # training
+    memory_capacity: int = None
+    wait_buffer_size: int = None
+    num_steps: int = None
     learning_rate: float = None
     batch_size: int = None
-    memory_capacity: int = None
-    num_steps: int = None
     gamma: float = None
-    wait_buffer_size: int = None
-    input_channels: int = None
+    
     use_wandb: bool = None
     
-    def __init__(self, config_file="default.yml", **kwargs):
-        self.load_config(config_file)
+    def __init__(self, config_file=None, **kwargs):
+        if config_file is not None:
+            self.load_config(config_file)
         for key, value in kwargs.items():
             setattr(self, key, value)
 
     def load_config(self, config_file):
-        with open(config_file, 'r') as file:
-            config = yaml.safe_load(file)
-        
-        for key, value in config.items():
-            try:
-                setattr(self, key, value)
-            except Exception as e:
-                print(f"Error setting {key} to {value}: {e}")
+        try:
+            with open(config_file, 'r') as file:
+                config = yaml.safe_load(file)
+            
+            for key, value in config.items():
+                try:
+                    setattr(self, key, value)
+                except Exception as e:
+                    print(f"Error setting {key} to {value}: {e}")
+        except:
+            pass
 
     def save_config(self, config_file):
         config = {
@@ -71,7 +82,7 @@ class DQNTrainingConfig(object):
         }
         return f'DQNTrainingConfig({config})'
 
-@ray.remote(num_gpus=0)
+@ray.remote
 class SharedServer:
     target_net_state_dict: Dict = None
     training_steps: int = 0
@@ -92,16 +103,22 @@ class SharedServer:
 
 @ray.remote
 class EnvRunner:
-    buffer: ray.ObjectRef[RayReplayBuffer]
+    buffer: ray.ObjectRef
+    server: ray.ObjectRef
     agent: GymAgent
+    env: GeneralsEnvironment
     
     def _handle_observation(self, experience: Experience):
         self.buffer.add.remote(experience)
     
-    def __init__(self, config: DQNTrainingConfig, agent: Agent, opponent: Agent, server: ray.ObjectRef[SharedServer], buffer: ray.ObjectRef[RayReplayBuffer]):
+    def __init__(self, config: DQNTrainingConfig, agent: Dict | Agent, opponent: Dict | Agent, server: ray.ObjectRef, buffer: ray.ObjectRef):
         self.config = config
         self.server = server
         self.buffer = buffer
+        if isinstance(agent, Dict) and agent["type"].lower() == "humanexe":
+            agent = HumanExeAgent(0, **agent)
+        if isinstance(opponent, Dict) and opponent["type"].lower() == "humanexe":
+            opponent = HumanExeAgent(1, **opponent)
         agent = ObservationReceiving(agent, observation_handler=self._handle_observation)
         self.env = gym.make("generals-v0", agent=agent, opponent=opponent, seed=config.seed, n_rows=config.n_rows, n_cols=config.n_cols)
         self.agent: GymAgent = self.env.agent
@@ -121,10 +138,11 @@ class EnvRunner:
                     gc.collect()
                     torch.cuda.empty_cache()
             self.env.reset()
-            self.agent.run_episodes(seed=agent_seed, n_runs=1000)
+            print("Running episode...")
+            self.agent.run_episodes(seed=agent_seed, n_runs=1)
 
 # Define training loop
-def train(config: DQNTrainingConfig, server: ray.ObjectRef[SharedServer], buffer: ray.ObjectRef[RayReplayBuffer]):
+def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRef):
     start_time = time.time()   
     target_net = DQN(config.input_channels, config.num_actions, config.n_rows, config.n_cols).cuda()
     target_net.load_state_dict(ray.get(server.get_target_state_dict.remote()))
@@ -137,12 +155,13 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef[SharedServer], buffer
     size = ray.get(buffer.size.remote())
     while size < config.wait_buffer_size:
         print(f"Buffer size: {size}")
-        time.sleep(5)
+        time.sleep(10)
         size = ray.get(buffer.size.remote())
     
     losses = []
     print("Starting training...")
     for step in trange(config.num_steps):
+        print("Training step:", step)
         data = ray.get(buffer.sample.remote(config.batch_size))
         s_t, a_t, r_t_1, d_t_1, s_t_1 = data
 
@@ -167,7 +186,13 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef[SharedServer], buffer
             }, step=step)
 
 if __name__ == "__main__":
-    config: DQNTrainingConfig = DQNTrainingConfig()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config_file", type=str, required=False, help="Path to a training config YAML file.")
+    args = parser.parse_args()
+
+    config_file = args.config_file
+    
+    config: DQNTrainingConfig = DQNTrainingConfig(config_file=config_file)
     
     np.random.seed(config.seed)
     torch.manual_seed(config.seed)
@@ -175,16 +200,32 @@ if __name__ == "__main__":
     random.seed(config.seed)
     torch.use_deterministic_algorithms(True)
     
+    ray.init()
+    
+    print("Starting ray cluster...")
+    time.sleep(10)
+    
     buffer = RayReplayBuffer.remote(config.memory_capacity)
     
     tgt_net = DQN(config.input_channels, config.num_actions, config.n_rows, config.n_cols).cpu()
     server = SharedServer.remote(tgt_net.state_dict())
     
+    print("initial states:")
+    print(ray.get(buffer.size.remote()))
+    print(list(ray.get(server.get_target_state_dict.remote()).keys())[:5])
+    
     configs = [copy.deepcopy(config) for _ in range(1000)]
     for i, c in enumerate(configs):
         c.seed = 2**(i % 29) + 2 * i + 1
-    env_runners = [EnvRunner.remote(config=random.sample(configs), agent=HumanExeAgent(0), opponent=HumanExeAgent(1), server=server, buffer=buffer) for _ in range(50)]
-    env_runners.extend([EnvRunner.remote(config=random.sample(configs), agent=DQNAgent(0, tgt_net, "cpu"), opponent=HumanExeAgent(1), server=server, buffer=buffer) for _ in range(100)])
+    env_runners = [EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 1)]
+    env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 1)])
+    # env_runners.extend([EnvRunner.remote(config=c, agent=DQNAgent(0, tgt_net, "cpu"), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 1)])
 
+    for runner in env_runners:
+        runner.run.remote()
+        
     # Initialize optimizer and replay memory
     train(config=config, server=server, buffer=buffer)
+    
+    for runner in env_runners:
+        ray.cancel(runner)

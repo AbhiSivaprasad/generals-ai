@@ -26,39 +26,35 @@ class GameMaster:
             # log initial board configuration
             self.logger.init(self.state.board)
     
-    def step(self) -> Generator[GameState, Any, Any]:
-        assert len(self.players) == 2 and self.players[0] is not None and self.players[1] is not None, "Game must have 2 players."
+    def step(self) -> GameState:
+        if self.state.board.terminal_status() != -1 or (self.max_turns is not None and self.state.turn < self.max_turns):
+            return self.state
         
-        while self.state.board.terminal_status() == -1 and (self.max_turns is None or self.state.turn < self.max_turns):
-            # each player outputs a move given their view
-            for moving_player_index, player in list(enumerate(self.players)):
-                action = player.move(self.state)
-                if action is None:
-                    continue
-
-                # check for validity of action
-                if not self.state.board.is_action_valid(action, moving_player_index):
-                    continue
-
-                # update game board with player's action
-                self.update_game_state(action)
-
-            # game logic to add troops to generals, cities, and land on specific ticks
-            self.add_troops_to_board()
-
-            self.state.turn += 1
+        # each player outputs a move given their view
+        for moving_player_index, player in list(enumerate(self.players)):
+            action = player.move(self.state)
+            if action is None:
+                continue
+            # check for validity of action
+            if not self.state.board.is_action_valid(action, moving_player_index):
+                continue
+            # update game board with player's action
+            self.update_game_state(action)
             
-            self.state.terminal_status = self.state.board.terminal_status()
-            
-            yield self.state
+        # game logic to add troops to generals, cities, and land on specific ticks
+        self.add_troops_to_board()
+        self.state.turn += 1
+        self.state.terminal_status = self.state.board.terminal_status()
+        return self.state            
 
     def play(self):
         """
         conduct game between players on given board
         :return: index of winning player or -1 if max turns reached
         """
-        _ = list(self.step())
-
+        assert len(self.players) == 2 and self.players[0] is not None and self.players[1] is not None, "Game must have 2 players."
+        while self.state.board.terminal_status() == -1 and (self.max_turns is None or self.state.turn < self.max_turns):
+            self.step()
         return self.state.board.terminal_status()
 
     def add_troops_to_board(self):

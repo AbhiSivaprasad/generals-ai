@@ -98,14 +98,14 @@ def generate_candidate_board_state(
 
 def _random_city_size(rng: Optional[np.random.Generator]):
     if rng:
-        return rng.integers(MIN_CITY_SIZE, MAX_CITY_SIZE, endpoint=True)
-    return np.random.randint(MIN_CITY_SIZE, MAX_CITY_SIZE)
+        return int(rng.integers(MIN_CITY_SIZE, MAX_CITY_SIZE, endpoint=True))
+    return int(np.random.randint(MIN_CITY_SIZE, MAX_CITY_SIZE))
 
 
 def _random_position(row, col, rng: Optional[np.random.Generator]):
     if rng:
-        return rng.integers(0, row), rng.integers(0, col)
-    return np.random.randint(0, row), np.random.randint(0, col)
+        return int(rng.integers(0, row)), int(rng.integers(0, col))
+    return int(np.random.randint(0, row)), int(np.random.randint(0, col))
 
 
 def _get_distance(pos1, pos2):

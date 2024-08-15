@@ -22,7 +22,7 @@ class EpsilonRandomAgent(AgentWrapper):
             return self.rng.choice(state.board.get_valid_actions(self.agent.player_index))
         return move
 
-    def reset(self, seed):
+    def reset(self, *args, seed = None, **kwargs) -> None:
         super().reset(seed=seed)
         self.rng = np.random.default_rng(self.seed)
         self.agent.reset(seed=seed)

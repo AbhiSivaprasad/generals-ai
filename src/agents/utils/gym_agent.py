@@ -3,11 +3,13 @@ import numpy as np
 from tqdm import tqdm
 
 from typing import List, Optional
+import gymnasium as gym
+
 from src.agents.agent import Agent
 from src.agents.utils.agent_wrapper import AgentWrapper
 from src.environment.action import Action
-from src.environment.environment import ActType, GeneralsEnvironment
-from src.environment.gamestate import GameState, ObsType
+from src.environment import ActType, ObsType
+from src.environment.gamestate import GameState
 from src.utils.replay_buffer import Experience
 
 
@@ -20,15 +22,15 @@ class GymAgent(AgentWrapper):
     action: Action = None
     
     agent: Agent
-    env: GeneralsEnvironment
+    env: gym.Env
     
     observation_space: Space
     action_space: Space
     
     gamma: float
     
-    def __init__(self, agent: Optional[Agent], env: Optional[GeneralsEnvironment] = None, gamma: float = 0.99, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, agent: Optional[Agent] = None, env: Optional[gym.Env] = None, gamma: float = 0.99, *args, **kwargs):
+        super().__init__(agent)
         self.set_action(None)
         self.set_env(env)
         if agent is not None:
@@ -58,7 +60,7 @@ class GymAgent(AgentWrapper):
     
     def get_action(self, obs: ObsType) -> ActType:
         assert self.agent is not None, "Need an agent to act!"
-        if isinstance(self.agent, "GymAgent"):
+        if isinstance(self.agent, GymAgent):
             return self.agent.get_action(obs)
         return self.agent.move(GameState.from_observation(obs, self.player_index))
     
@@ -101,9 +103,9 @@ class GymAgent(AgentWrapper):
         all_rewards = []
         powers = np.random.default_rng(seed).integers(2, 15, n_runs)
         offsets = np.random.default_rng(seed).integers(0, 32, n_runs)
-        seeds = np.pow(2, powers) + offsets
+        seeds = np.power(2, powers) + offsets
         for seed in tqdm(seeds):
-            rewards = self.run_episode(seeds[seed])
+            rewards = self.run_episode(int(seed))
             for i in range(len(rewards)):
                 rewards[i:] *= self.gamma
             all_rewards.append(rewards)
