@@ -23,9 +23,9 @@ class CuriousGeorgeAgent(Agent):
 
     def move(self, state: torch.Tensor, env: GeneralsEnvironment):
         sample = random.random()
-        steps += 1
+        self.steps += 1
         eps_threshold = self.eps_end + (self.eps_start - self.eps_end) * math.exp(
-            -1.0 * steps / self.eps_decay
+            -1.0 * self.steps / self.eps_decay
         )
         if sample > eps_threshold:
             with torch.no_grad():

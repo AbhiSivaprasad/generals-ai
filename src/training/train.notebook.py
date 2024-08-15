@@ -71,6 +71,9 @@ FOG_OF_WAR = False
 INPUT_CHANNELS = get_input_channel_dimension_size(FOG_OF_WAR)
 
 # %%
+N_ACTIONS = 4 * N_ROWS * N_COLUMNS
+
+# %%
 policy_net = DQN(N_ROWS, N_COLUMNS, INPUT_CHANNELS, N_ACTIONS).to(device)
 target_net = DQN(N_ROWS, N_COLUMNS, INPUT_CHANNELS, N_ACTIONS).to(device)
 target_net.load_state_dict(policy_net.state_dict())
@@ -90,9 +93,6 @@ env = GeneralsEnvironment(
         ),
     ]
 )
-
-# %%
-N_ACTIONS = list(env.action_spaces.values())[0].n
 
 # %%
 # Get the number of state observations
@@ -224,8 +224,8 @@ for i_episode in range(num_episodes):
     num_players = len(env.unwrapped.players)
     for t in count():
         actions = {
-            agent_name: select_action(state[agent_name]).item()
-            for agent_name in state.keys()
+            agent_name: agent.move(state[agent_name], env).item()
+            for agent_name, agent in zip(env.unwrapped.agent_names, env.unwrapped.players)
         }
         observation, rewards, terminated, truncated, _ = env.step(actions)
         convert_agent_dict_to_tensor(rewards)
