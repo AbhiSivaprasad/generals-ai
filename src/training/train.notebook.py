@@ -55,7 +55,7 @@ plt.ion()
 
 # %%
 # if GPU is to be used
-device = torch.device("cuda" if torch.backends.mps.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # %%
 BATCH_SIZE = 128  # replay buffer sample size
@@ -210,15 +210,14 @@ def convert_agent_dict_to_tensor(agent_dict, dtype=torch.float32):
 
 # %%
 LOG_DIR = Path("resources/replays")
+LOG_DIR.mkdir(exist_ok=True, parents=True)
 
 # %%
 import json
-with open("/home/abhi/projects/generals-ai/resources/replays/0.json", "r") as f:
-    file = json.load(f)
+# with open("/home/abhi/projects/generals-ai/resources/replays/0.json", "r") as f:
+#     file = json.load(f)
 
-len(file["boardDiffs"])
-
-# %%
+# len(file["boardDiffs"])
 
 # %%
 for i_episode in range(num_episodes):
@@ -235,8 +234,8 @@ for i_episode in range(num_episodes):
         observation, rewards, terminated, truncated, _ = env.step(actions)
         convert_agent_dict_to_tensor(rewards)
         convert_agent_dict_to_tensor(actions, dtype=torch.long)
-        terminated = list(terminated.values())[0]
         truncated = list(truncated.values())[0]
+        terminated = list(terminated.values())[0]
         done = terminated or truncated
 
         # next state is none if the game is terminated

@@ -12,6 +12,7 @@ app = Flask(__name__)
 
 @app.route("/replay/<replay_id>")
 def serve_replay(replay_id):
+    print("request for replay id:", replay_id)
     replay_file = f"{replay_id}.json"
     replay_path = ROOT_DIR / f"resources/replays/{replay_file}"
 
@@ -25,6 +26,5 @@ if __name__ == "__main__":
     app.run(debug=True, port=8000)
 
 # TASKS
-# implement generals.io api
 # implement socket server to visualize games in real time
 # style visualization page

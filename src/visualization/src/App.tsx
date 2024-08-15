@@ -9,7 +9,6 @@ import { useParams } from 'react-router-dom';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 
 
-
 /**
  * apply a move to a board state and return new board state
  * @param board
