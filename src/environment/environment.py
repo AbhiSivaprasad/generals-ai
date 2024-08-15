@@ -73,6 +73,10 @@ class GeneralsEnvironment(ParallelEnv):
         )
         self.previous_player_scores = {agent_name: 0 for agent_name in self.agent_names}
 
+        # reset player states
+        for player in self.players:
+            player.reset()
+
         observations = self._get_observations()
         infos = {agent_name: {} for agent_name in self.agent_names}
         return observations, infos
@@ -106,6 +110,9 @@ class GeneralsEnvironment(ParallelEnv):
         }
 
     def _get_rewards(self):
+        # reward component 1: change in difference between agent's score and other agent's score
+        # reward component 2: win/loss
+        # final reward is component 2 + 0.01 * component 1
         player_scores = {
             agent_name: self.game_master.board.get_player_score(i)
             for i, agent_name in enumerate(self.agent_names)

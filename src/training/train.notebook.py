@@ -34,6 +34,7 @@ import torch.nn.functional as F
 # %%
 from src.environment.environment import GeneralsEnvironment
 from src.agents.random_agent import RandomAgent
+from src.agents.curiousgeorge_agent import CuriousGeorgeAgent
 from src.training.dqn.dqn import DQN
 from src.training.input import (
     get_input_channel_dimension_size,
@@ -41,9 +42,6 @@ from src.training.input import (
 )
 from src.training.dqn.replay_memory import ReplayMemory, Transition
 from src.environment.logger import Logger
-
-# %%
-env = GeneralsEnvironment(players=[RandomAgent(0), RandomAgent(0)])
 
 # %%
 # set up matplotlib
@@ -71,6 +69,29 @@ N_ROWS = 3
 N_COLUMNS = 3
 FOG_OF_WAR = False
 INPUT_CHANNELS = get_input_channel_dimension_size(FOG_OF_WAR)
+
+# %%
+policy_net = DQN(N_ROWS, N_COLUMNS, INPUT_CHANNELS, N_ACTIONS).to(device)
+target_net = DQN(N_ROWS, N_COLUMNS, INPUT_CHANNELS, N_ACTIONS).to(device)
+target_net.load_state_dict(policy_net.state_dict())
+env = GeneralsEnvironment(
+    players=[
+        CuriousGeorgeAgent(
+            policy_net=policy_net,
+            eps_start=EPS_START,
+            eps_end=EPS_END,
+            eps_decay=EPS_DECAY,
+        ),
+        CuriousGeorgeAgent(
+            policy_net=policy_net,
+            eps_start=EPS_START,
+            eps_end=EPS_END,
+            eps_decay=EPS_DECAY,
+        ),
+    ]
+)
+
+# %%
 N_ACTIONS = list(env.action_spaces.values())[0].n
 
 # %%
@@ -79,38 +100,12 @@ state, info = env.reset()
 n_observations = len(state)
 
 # %%
-policy_net = DQN(N_ROWS, N_COLUMNS, INPUT_CHANNELS, N_ACTIONS).to(device)
-target_net = DQN(N_ROWS, N_COLUMNS, INPUT_CHANNELS, N_ACTIONS).to(device)
-target_net.load_state_dict(policy_net.state_dict())
-
-# %%
 optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
 memory = ReplayMemory(10000)
 
 
 # %%
 steps_done = 0
-
-
-# %%
-def select_action(state):
-    global steps_done
-    sample = random.random()
-    eps_threshold = EPS_END + (EPS_START - EPS_END) * math.exp(
-        -1.0 * steps_done / EPS_DECAY
-    )
-    steps_done += 1
-    if sample > eps_threshold:
-        with torch.no_grad():
-            # argmax returns the indices of the maximum values along the specified dimension
-            return policy_net(state).argmax(dim=1).squeeze()
-    else:
-        return torch.tensor(
-            [[list(env.action_spaces.values())[0].sample()]],
-            device=device,
-            dtype=torch.long,
-        ).squeeze()
-
 
 # %%
 episode_durations = []
@@ -214,6 +209,7 @@ LOG_DIR.mkdir(exist_ok=True, parents=True)
 
 # %%
 import json
+
 # with open("/home/abhi/projects/generals-ai/resources/replays/0.json", "r") as f:
 #     file = json.load(f)
 
