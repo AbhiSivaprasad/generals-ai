@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
+import sys
+import threading
 from typing import Tuple, List
 
+import numpy as np
 import ray
-
 from src.environment import ObsType, ActType
 
-from ray.rllib.utils.replay_buffers import replay_buffer as ray_replay_buffer
+from torchrl.data import ReplayBuffer as TorchReplayBuffer, ListStorage
 
 Experience = Tuple[ObsType, ActType, float, ObsType, bool]
 
@@ -22,29 +24,45 @@ class ReplayBuffer(ABC):
     def size(self) -> int:
         pass
 
-@ray.remote
+@ray.remote(num_cpus=1, memory=3*(1024**4))
 class RayReplayBuffer(ReplayBuffer):
-    ray_buffer: ray_replay_buffer.ReplayBuffer
+    buffer: List[Experience]
+    capacity: int
     
-    def __init__(self, capacity: int):
-        self.ray_buffer = ray_replay_buffer.ReplayBuffer(capacity=capacity, storage_unit=ray_replay_buffer.StorageUnit.FRAGMENTS)
+    rng: np.random.Generator
+    lock: threading.Lock
+    
+    def __init__(self, capacity: int, seed: int):
+        self.rng = np.random.default_rng(seed)
+        self.capacity = capacity
+        self.buffer = []
+        self.lock = threading.Lock()
     
     def add(self, samples: List[Experience]):
-        sample_dict = {
-            "s0": [sample[0] for sample in samples],
-            "a": [sample[1] for sample in samples],
-            "r": [sample[2] for sample in samples],
-            "s1": [sample[3] for sample in samples],
-            "d": [sample[4] for sample in samples],
-        }
-        self.ray_buffer.add(ray_replay_buffer.SampleBatch(sample_dict))
+        self.lock.acquire()
+        self.buffer.extend(samples)
+        self.buffer = self.buffer[-self.capacity:]
+        self.lock.release()
+        # print(f"[INFO] Added {len(samples)} samples to buffer.")
+        # print(f"[INFO] Buffer size: {len(self.buffer)}")
+        # print(f"[INFO] Buffer size (bytes): {sys.getsizeof(self.buffer)}")
 
     def sample(self, size: int) -> List[Experience]:
-        batch: ray_replay_buffer.SampleBatch = self.ray_buffer.sample(size)
-        list: List[Experience] = [(batch["s0"][i], batch["a"][i], batch["r"][i], batch["s1"][i], batch["d"][i]) for i in range(size)]
-        return list
+        success = self.lock.acquire()
+        if success:
+            idx = self.rng.integers(0, len(self.buffer), size)
+            batch = [self.buffer[i] for i in idx]
+            self.lock.release()
+            return batch
+        print("[ERROR] Failed to acquire lock on buffer.")
+        return []
     
     def size(self) -> int:
-        return len(self.ray_buffer)
-    
+        success = self.lock.acquire()
+        if success:
+            size = len(self.buffer)
+            self.lock.release()
+            return size
+        print("[ERROR] Failed to acquire lock on buffer.")
+        return -1
     

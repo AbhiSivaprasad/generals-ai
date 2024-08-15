@@ -13,7 +13,6 @@ import yaml
 import gc
 from tqdm import trange
 import random
-import sys
 
 from src.agents.agent import Agent
 from src.agents.human_exe_agent import HumanExeAgent
@@ -82,26 +81,26 @@ class DQNTrainingConfig(object):
         }
         return f'DQNTrainingConfig({config})'
 
-@ray.remote
+@ray.remote(num_cpus=1, memory=10 * 1024 * 1024)
 class SharedServer:
-    target_net_state_dict: Dict = None
+    target_net: torch.nn.Module = None
     training_steps: int = 0
     
-    def __init__(self, target_net_state_dict: Dict):
-        self.target_net_state_dict = target_net_state_dict
+    def __init__(self, target_net: torch.nn.Module):
+        self.target_net = target_net
         self.training_steps = 0
         
-    def get_target_state_dict(self):
-        return self.target_net_state_dict
+    def get_target_net(self):
+        return self.target_net
     
-    def set_target_state_dict(self, dict: Dict):
-        self.target_net_state_dict = dict
+    def set_target_net(self, net: torch.nn.Module):
+        self.target_net = net
     
     def increment_training_steps(self):
         self.training_steps += 1
         return self.training_steps
 
-@ray.remote
+@ray.remote(num_cpus=1)
 class EnvRunner:
     buffer: ray.ObjectRef
     server: ray.ObjectRef
@@ -130,22 +129,19 @@ class EnvRunner:
             agent_seed = rng.integers(0, 2**29)
             if isinstance(self.agent.unwrapped, DQNAgent):
                 dqn_agent: DQNAgent = self.agent.unwrapped
-                model = dqn_agent.model.cuda()
-                state_dict = ray.get(self.server.get_target_state_dict.remote())
-                if state_dict is not None:
-                    model.load_state_dict(state_dict)
-                    dqn_agent.update_model(model.cuda())
-                    gc.collect()
-                    torch.cuda.empty_cache()
+                model: torch.nn.Module = ray.get(self.server.get_target_net.remote())
+                model.cuda()
+                dqn_agent.update_model(model.cuda())
+                gc.collect()
+                torch.cuda.empty_cache()    
             self.env.reset()
             print("Running episode...")
-            self.agent.run_episodes(seed=agent_seed, n_runs=1)
+            self.agent.run_episodes(seed=agent_seed, n_runs=100)
 
 # Define training loop
 def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRef):
     start_time = time.time()   
-    target_net = DQN(config.input_channels, config.num_actions, config.n_rows, config.n_cols).cuda()
-    target_net.load_state_dict(ray.get(server.get_target_state_dict.remote()))
+    target_net: torch.nn.Module = ray.get(server.get_target_net.remote())
     target_net.eval()
     
     policy_net = DQN(config.input_channels, config.num_actions, config.n_rows, config.n_cols).cuda().train()
@@ -155,7 +151,7 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
     size = ray.get(buffer.size.remote())
     while size < config.wait_buffer_size:
         print(f"Buffer size: {size}")
-        time.sleep(10)
+        time.sleep(5)
         size = ray.get(buffer.size.remote())
     
     losses = []
@@ -186,7 +182,7 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
             }, step=step)
 
 if __name__ == "__main__":
-    ray.init()
+    ray.init(_memory=15 * 1024**4) # TiB
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_file", type=str, required=False, help="Path to a training config YAML file.")
@@ -205,27 +201,36 @@ if __name__ == "__main__":
     print("Starting ray cluster...")
     time.sleep(5)
     
-    buffer = RayReplayBuffer.remote(config.memory_capacity)
+    print("Cluster resources: ", ray.cluster_resources())
+    
+    print("Initializing buffer and target network params...")
+    buffer = RayReplayBuffer.remote(config.memory_capacity, config.seed)
     
     tgt_net = DQN(config.input_channels, config.num_actions, config.n_rows, config.n_cols).cpu()
-    server = SharedServer.remote(tgt_net.state_dict())
+    server = SharedServer.remote(tgt_net)
+    del tgt_net
+    
+    time.sleep(5)
     
     print("initial states:")
-    print(ray.get(buffer.size.remote()))
-    print(list(ray.get(server.get_target_state_dict.remote()).keys())[:5])
+    print("Buffer size: ", ray.get(buffer.size.remote()))
+    print("Target network: ", list(ray.get(server.get_target_net.remote()).state_dict().keys())[:5])
     
     configs = [copy.deepcopy(config) for _ in range(1000)]
     for i, c in enumerate(configs):
         c.seed = 2**(i % 29) + 2 * i + 1
-    env_runners = [EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 1)]
-    # env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 1)])
-    # env_runners.extend([EnvRunner.remote(config=c, agent=DQNAgent(0, tgt_net, "cpu"), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 1)])
+    
+    env_runners = [EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 50)]
+    env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 50)])
+    # env_runners.extend([EnvRunner.options(num_gpus=0.05).remote(config=c, agent=DQNAgent(0, None, None), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 1)])
+
+    time.sleep(5)
 
     for runner in env_runners:
         runner.run.remote()
         
     # Initialize optimizer and replay memory
-    train(config=config, server=server, buffer=buffer)
+    train_task = train(config=config, server=server, buffer=buffer)
     
     for runner in env_runners:
         ray.cancel(runner)

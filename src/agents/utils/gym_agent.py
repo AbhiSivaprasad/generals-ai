@@ -37,7 +37,7 @@ class GymAgent(AgentWrapper):
             self.set_agent(agent)
         self.gamma = gamma
         
-    def set_action(self, action):
+    def set_action(self, action: Action):
         self.action = action
     
     def set_env(self, env):
@@ -62,7 +62,8 @@ class GymAgent(AgentWrapper):
         assert self.agent is not None, "Need an agent to act!"
         if isinstance(self.agent, GymAgent):
             return self.agent.get_action(obs)
-        return self.agent.move(GameState.from_observation(obs, self.player_index))
+        s = GameState.from_observation(obs, self.player_index)
+        return Action.to_space_sample(self.agent.move(s), s.board.num_rows, s.board.num_cols)
     
     def run_episode(self, seed=None) -> List[float]:
         '''
@@ -104,8 +105,9 @@ class GymAgent(AgentWrapper):
         powers = np.random.default_rng(seed).integers(2, 15, n_runs)
         offsets = np.random.default_rng(seed).integers(0, 32, n_runs)
         seeds = np.power(2, powers) + offsets
-        for seed in tqdm(seeds):
+        for seed in seeds:
             rewards = self.run_episode(int(seed))
+            rewards = np.array(rewards, dtype=np.float32)
             for i in range(len(rewards)):
                 rewards[i:] *= self.gamma
             all_rewards.append(rewards)

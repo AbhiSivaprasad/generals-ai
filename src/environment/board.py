@@ -7,6 +7,11 @@ class Board:
     """
     Board a representation of the board with necessary helper methods
     """
+    num_cols: int
+    num_rows: int
+    cities: List[Tile]
+    generals: List[Tile]
+    grid: List[List[Tile]]
 
     def __init__(self, num_rows: int, num_cols: int):
         self.num_rows = num_rows

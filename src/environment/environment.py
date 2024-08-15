@@ -11,6 +11,7 @@ from gymnasium.spaces import Space, \
 from src.agents.utils.gym_agent import GymAgent
 from src.environment import MAX_SIZE, board_generator, game_master
 from src.agents.agent import Agent
+from src.environment.action import Action
 from src.environment.logger import Logger
 from src.environment import ObsType, ActType
 
@@ -27,6 +28,12 @@ class GeneralsEnvironment(gym.Env):
     opponent: Agent
     
     game: game_master.GameMaster
+    
+    num_rows: int
+    num_cols: int
+    mountain_probability: float
+    city_probability: float
+    min_ratio_of_generals_distance_to_board_side: float
     
     def __init__(
         self, 
@@ -86,6 +93,7 @@ class GeneralsEnvironment(gym.Env):
         '''
         self._prev_state = self.game.state
         reward = 0.0
+        action = Action.from_space_sample(action, self.num_rows, self.num_cols)
         self.agent.set_action(action)
         legal_move = self.game.state.board.is_action_valid(action, self.agent.player_index)
         reward += (1 - legal_move) * -1.0 # penalize illegal moves / invalid actions

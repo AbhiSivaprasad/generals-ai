@@ -18,6 +18,8 @@ class QGreedyAgent(Agent):
         observation = state.to_observation(self.player_index)
         q_values = self.q_function(observation)
         best_action, q_value = max(q_values, key=lambda x: x[1])
+        r, c = state.board.num_rows, state.board.num_cols
+        best_action = Action.from_space_sample(best_action, r, c)
         return best_action
     
     def reset(self, *args, **kwargs) -> None:
@@ -64,7 +66,7 @@ class DQNAgent(QGreedyAgent):
             obs = torch.tensor(obs, dtype=torch.float32).to(device=device)
             with torch.no_grad():
                 q_values = model(obs).detach().numpy()
-            return [(Action.from_space_sample(i, rows, cols), q_values[i]) for i in range(len(q_values))]
+            return [(i, q_values[i]) for i in range(len(q_values))]
         return q_function
     
     def update_model(self, model: torch.nn.Module, device: torch.device = None) -> None:

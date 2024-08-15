@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 
@@ -18,8 +18,11 @@ class Action:
     starty: int
     direction: Direction
     
-    def to_space_sample(self, num_rows: int, num_col: int) -> int:
-        return np.ravel_multi_index((self.starty, self.startx, self.direction.value), (num_rows, num_col, 4)) + 1
+    @classmethod
+    def to_space_sample(cls, action: Optional["Action"], num_rows: int, num_col: int) -> int:
+        if action is None:
+            return 0
+        return np.ravel_multi_index((action.starty, action.startx, action.direction.value), (num_rows, num_col, 4)) + 1
     
     @classmethod
     def from_space_sample(cls, sample: int, num_rows: int, num_col: int) -> "Action":
