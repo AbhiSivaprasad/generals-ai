@@ -145,7 +145,7 @@ class GeneralsEnvironment(ParallelEnv):
             for agent_name, player_score_change in player_score_changes.items()
         }
 
-        main_rewards = self._get_main_rewards()
+        main_rewards = self.get_main_rewards()
         total_rewards = {
             agent_name: main_rewards[agent_name]
             + self.auxiliary_reward_weight * auxiliary_rewards[agent_name]
@@ -154,7 +154,7 @@ class GeneralsEnvironment(ParallelEnv):
         self.previous_player_scores = player_scores
         return total_rewards
 
-    def _get_main_rewards(self):
+    def get_main_rewards(self):
         winning_player_index = self.game_master.board.terminal_status()
         main_rewards = {}
         for i, agent_name in enumerate(self.agent_name_by_player_index):

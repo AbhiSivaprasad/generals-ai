@@ -43,6 +43,7 @@ from src.training.input import (
 )
 from src.training.dqn.replay_memory import ReplayMemory, Transition
 from src.environment.logger import Logger
+from src.training.utils import convert_agent_dict_to_tensor
 
 # %%
 # set up matplotlib
@@ -144,7 +145,6 @@ n_observations = len(state)
 optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
 memory = ReplayMemory(10000)
 
-
 # %%
 steps_done = 0
 
@@ -228,25 +228,21 @@ def optimize_model():
 
 
 # %%
-def convert_agent_dict_to_tensor(agent_dict, dtype=torch.float32):
-    for agent_name in agent_dict.keys():
-        agent_dict[agent_name] = torch.tensor(
-            agent_dict[agent_name], dtype=dtype, device=device
-        )
-
-
-# %%
 LOG_DIR = Path("resources/replays")
+LOG_DIR.mkdir(exist_ok=True, parents=True)
+CHECKPOINT_DIR = Path("resources/checkpoints")
 LOG_DIR.mkdir(exist_ok=True, parents=True)
 
 # %%
 num_episodes = 1000
+log_interval = 50
+checkpoint_interval = 50
 global_step = 0
 for i_episode in range(num_episodes):
     logger = Logger()
     # Initialize the environment and get its state
     state, info = env.reset(logger=logger)
-    convert_agent_dict_to_tensor(state)
+    convert_agent_dict_to_tensor(state, device=device)
     num_players = len(env.unwrapped.players)
     for t in count():
         actions = {
@@ -256,8 +252,8 @@ for i_episode in range(num_episodes):
             )
         }
         observation, rewards, terminated, truncated, info = env.step(actions)
-        convert_agent_dict_to_tensor(rewards)
-        convert_agent_dict_to_tensor(actions, dtype=torch.long)
+        convert_agent_dict_to_tensor(rewards, device=device)
+        convert_agent_dict_to_tensor(actions, dtype=torch.long, device=device)
         truncated = list(truncated.values())[0]
         terminated = list(terminated.values())[0]
         done = terminated or truncated
@@ -266,7 +262,7 @@ for i_episode in range(num_episodes):
         if terminated:
             next_state = {agent_name: None for agent_name in state.keys()}
         else:
-            convert_agent_dict_to_tensor(observation)
+            convert_agent_dict_to_tensor(observation, device=device)
             next_state = observation
 
         # Store the transitions in memory
@@ -285,7 +281,11 @@ for i_episode in range(num_episodes):
         loss = optimize_model()
         legal_move_rate = list(info.values())[0]["is_game_action_legal"]
         wandb.log(
-            {"step": global_step, "loss": loss, "legal_move_rate": legal_move_rate}
+            {
+                "step": global_step,
+                "loss": loss,
+                "legal_move": int(legal_move_rate),
+            }
         )
 
         # Soft update of the target network's weights
@@ -300,10 +300,16 @@ for i_episode in range(num_episodes):
 
         if done:
             wandb.log({"step": global_step, "duration": t})
-            logger.write(LOG_DIR / f"{i_episode}.json")
+            if i_episode % checkpoint_interval == 0:
+                policy_net.save_checkpoint(CHECKPOINT_DIR, i_episode)
+            if i_episode % log_interval == 0:
+                logger.write(LOG_DIR / f"{i_episode}.json")
             break
 
         global_step += 1
+
+# %%
+# !find resources/replays -mindepth 1 -print0 | xargs -0 -P $(nproc) rm -rf
 
 # %%
 print("Complete")
