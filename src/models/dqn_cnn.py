@@ -6,6 +6,11 @@ from src.models.utils import ConvNeXtBlock, ParallelSum
 
 
 class DQN(nn.Module):
+    """
+    The Deep Q-Network model. This model is a convolutional neural network that takes in an image of the game state and outputs a Q-value for each action.
+    Input: (batch_size, n_rows, n_cols, input_channels) the grid value, see src/environment/environment.py for more details
+    Output: (batch_size, num_actions) the q-values
+    """
     def __init__(
         self, 
         input_channels, 
@@ -14,7 +19,7 @@ class DQN(nn.Module):
         n_cols,
         spatial_dropout=0.0,
         encoder_dim=64,
-        encoder_depth=3,
+        encoder_depth=1,
         block_dim=64,
         n_blocks=1
         
@@ -43,6 +48,7 @@ class DQN(nn.Module):
         )
 
     def forward(self, x):
+        x = x.permute(0, 3, 1, 2)
         x = self.encoder(x)
         x = self.blocks(x)
         x = self.fc_layers(x)

@@ -16,7 +16,7 @@ class GameState:
     turn: int
     terminal_status: int = -1
     
-    def to_observation(self, player_index: int) -> ObsType:
+    def to_observation(self, player_index: int, fog_of_war: bool = True) -> ObsType:
         state = self
         # [army, 1-hot general, 1-hot city, 1-hot mountain, 1-hot in-bounds, 0/1 is_mine, 0/1 visible
         obs = np.zeros((MAX_SIZE[0], MAX_SIZE[1], 7), dtype=np.float32)
@@ -25,7 +25,7 @@ class GameState:
             if 0 <= r < board_r and 0 <= c < board_c:
                 tile = state.board.grid[r][c]
                 obs[r, c, 4] = 1
-                if tile.player_visibilities[player_index]:
+                if tile.player_visibilities[player_index] or not fog_of_war:
                     obs[r, c, 0] = tile.army
                     obs[r, c, 1] = 1 if tile.type == TileType.GENERAL else 0
                     obs[r, c, 2] = 1 if tile.type == TileType.CITY else 0

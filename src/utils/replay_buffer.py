@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import gc
 import sys
 import threading
 from typing import Tuple, List
@@ -24,7 +25,7 @@ class ReplayBuffer(ABC):
     def size(self) -> int:
         pass
 
-@ray.remote(num_cpus=1, memory=3*(1024**4))
+@ray.remote(num_cpus=1, memory=1*(1024**4), max_restarts=0, max_task_retries=0)
 class RayReplayBuffer(ReplayBuffer):
     buffer: List[Experience]
     capacity: int
@@ -39,16 +40,21 @@ class RayReplayBuffer(ReplayBuffer):
         self.lock = threading.Lock()
     
     def add(self, samples: List[Experience]):
-        self.lock.acquire()
-        self.buffer.extend(samples)
-        self.buffer = self.buffer[-self.capacity:]
-        self.lock.release()
+        s = self.lock.acquire(timeout=10)
+        if s:
+            if len(self.buffer) + len(samples) > self.capacity:
+                self.buffer = self.buffer[len(samples):]
+            self.buffer.extend(samples)
+            l = len(self.buffer)
+            print(f"[INFO] Buffer size: {l}")
+            self.lock.release()
+            gc.collect()
         # print(f"[INFO] Added {len(samples)} samples to buffer.")
         # print(f"[INFO] Buffer size: {len(self.buffer)}")
-        # print(f"[INFO] Buffer size (bytes): {sys.getsizeof(self.buffer)}")
+        # print(f"[INFO] Buffer size (bytes): {sys.getsizeof(self)}")
 
     def sample(self, size: int) -> List[Experience]:
-        success = self.lock.acquire()
+        success = self.lock.acquire(timeout=10)
         if success:
             idx = self.rng.integers(0, len(self.buffer), size)
             batch = [self.buffer[i] for i in idx]
@@ -58,7 +64,7 @@ class RayReplayBuffer(ReplayBuffer):
         return []
     
     def size(self) -> int:
-        success = self.lock.acquire()
+        success = self.lock.acquire(timeout=10)
         if success:
             size = len(self.buffer)
             self.lock.release()

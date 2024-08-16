@@ -105,10 +105,10 @@ class GymAgent(AgentWrapper):
         powers = np.random.default_rng(seed).integers(2, 15, n_runs)
         offsets = np.random.default_rng(seed).integers(0, 32, n_runs)
         seeds = np.power(2, powers) + offsets
-        for seed in seeds:
+        for idx, seed in enumerate(seeds):
+            print("[INFO] Running episode ", idx)
             rewards = self.run_episode(int(seed))
-            rewards = np.array(rewards, dtype=np.float32)
-            for i in range(len(rewards)):
-                rewards[i:] *= self.gamma
-            all_rewards.append(rewards)
+            episode_len = len(rewards)
+            rewards = np.array(rewards, dtype=np.float32) * np.power(self.gamma, np.arange(episode_len))
+            all_rewards.append(int(np.sum(rewards)))
         return all_rewards
