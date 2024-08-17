@@ -91,19 +91,19 @@ class DQNTrainingConfig(object):
         }
         return f'DQNTrainingConfig({config})'
 
-@ray.remote(num_cpus=1, memory=10 * 1024**3, max_restarts=0, max_task_retries=0)
+@ray.remote(num_cpus=1, memory=2 * 1024**3, max_restarts=0, max_task_retries=0)
 class SharedServer:
-    target_net: torch.nn.Module = None
+    target_net: Dict = None
     training_steps: int = 0
     
-    def __init__(self, target_net: torch.nn.Module):
+    def __init__(self, target_net: Dict):
         self.target_net = target_net
         self.training_steps = 0
         
     def get_target_net(self):
         return self.target_net
     
-    def set_target_net(self, net: torch.nn.Module):
+    def set_target_net(self, net: Dict):
         self.target_net = net
     
     def increment_training_steps(self):
@@ -113,7 +113,7 @@ class SharedServer:
     def get_training_steps(self):
         return self.training_steps
 
-@ray.remote(num_cpus=0.5)
+@ray.remote(num_cpus=0.1)
 class EnvRunner:
     buffer: ray.ObjectRef
     server: ray.ObjectRef
@@ -199,15 +199,16 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
     losses = []
     print("Starting training...")
     for train_step in trange(config.num_steps, miniters=20):
-        print("Training step:", train_step)
+        print("Training step:", train_step, ray.get(server.increment_training_steps.remote()))
+        
         data = ray.get(buffer.sample.remote(config.batch_size))
         experience_batch  = tuple([list(t) for t in zip(*data)])
         s_t, a_t, r_t_1, s_t_1, d_t_1 = experience_batch
         # print("[INFO] Sampled experience batch: ", experience_batch)
         
         # decouple (turn, grid) ObsType
-        s_t = [np.array(grid) for (_, grid) in s_t]
-        s_t_1 = [np.array(grid) for (_, grid) in s_t_1]
+        s_t = np.array([np.array(grid) for (_, grid) in s_t])
+        s_t_1 = np.array([np.array(grid) for (_, grid) in s_t_1])
         
         with torch.inference_mode():
             s_t_1 = torch.tensor(s_t_1, dtype=torch.float32).cuda()
@@ -232,23 +233,28 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
         optimizer.zero_grad()
         
         if config.use_wandb:
+            grad_norm = torch.norm(torch.nn.utils.parameters_to_vector(policy_net.parameters()), 2.0)
+            grad_max = torch.max(torch.nn.utils.parameters_to_vector(policy_net.parameters()))
             wandb.log({
                 "loss": loss.item(),
                 "q_values": predicted_q_vals.max().item(),
-                "SPS": int(train_step / (time.time() - start_time))
+                "SPS": int(train_step / (time.time() - start_time)),
+                "grad_norm": grad_norm.item(),
+                "grad_max": grad_max.item()
             }, step=train_step)
             
-        if train_step % config.target_update_freq == 0:
+        if (train_step + 1) % config.target_update_freq == 0:
             target_net.load_state_dict(policy_net.state_dict())
-            server.set_target_net.remote(target_net.state_dict())
+            server.set_target_net.remote(target_net.cpu().state_dict())
+            target_net.cuda()
             print("[INFO] Updated target network.")
         
-        if train_step % (train_step // 100) == 0:
+        if (train_step + 1) % (config.num_steps // 100) == 0:
             print("[INFO] Running validation episodes...")
             val_env_rand.reset()
             val_env_humanexe.reset()
-            reward_rand = np.array(val_env_rand.agent.run_episodes(n_runs=10)).mean()
-            reward_humanexe = np.array(val_env_humanexe.agent.run_episodes(n_runs=10)).mean()
+            reward_rand = np.array(val_env_rand.agent.run_episodes(seed=config.seed, n_runs=2)).mean()
+            reward_humanexe = np.array(val_env_humanexe.agent.run_episodes(seed=config.seed, n_runs=2)).mean()
             print("[INFO] Validation rewards: ", reward_rand, "--", reward_humanexe)
             
             if config.use_wandb:
@@ -305,12 +311,14 @@ if __name__ == "__main__":
         c.seed = 2**(i % 29) + 2 * i + 1
     
     env_runners = []
-    env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 10)])
-    env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 10)])
-    env_runners.extend([EnvRunner.options(num_gpus=0.05).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.3, c.seed), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 10)])
-    env_runners.extend([EnvRunner.options(num_gpus=0.05).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.3, c.seed + 2**7 - 1), opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 10)])
-    
+    env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 20)])
     time.sleep(10)
+    env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 10)])
+    time.sleep(10)
+    env_runners.extend([EnvRunner.options(num_gpus=0.05).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.3, c.seed), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 10)])
+    time.sleep(10)
+    env_runners.extend([EnvRunner.options(num_gpus=0.05).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.3, c.seed + 2**7 - 1), opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 30)])
+    
     
     run_tasks = [runner.run.remote() for runner in env_runners]
     

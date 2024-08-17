@@ -104,7 +104,7 @@ class GeneralsEnvironment(gym.Env):
         if terminated:
             agentWon = self.game.state.board.terminal_status() == self.agent.player_index
             multiplier = 1.0 if agentWon else -1.0
-            reward += (multiplier * (0.1/self.agent.gamma))
+            reward += (multiplier * (0.1/(1.0-self.agent.gamma)))
         
         return (new_obs, reward, terminated, False, {"opponent": self.opponent, "legal_move": legal_move, "game_state": self.game.state, "prev_state": self._prev_state})
 
@@ -114,5 +114,5 @@ from gymnasium.envs.registration import register
 register(
      id="generals-v0",
      entry_point=GeneralsEnvironment,
-     max_episode_steps=1000,
+     max_episode_steps=500,
 )
