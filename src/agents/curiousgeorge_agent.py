@@ -35,13 +35,17 @@ class CuriousGeorgeAgent(Agent):
         if sample > eps_threshold:
             with torch.no_grad():
                 # argmax returns the indices of the maximum values along the specified dimension
-                return self.policy_net(state).argmax(dim=1).squeeze()
+                return self.policy_net(state).argmax(dim=1).squeeze().item()
         else:
-            return torch.tensor(
-                [[list(env.action_spaces.values())[0].sample()]],
-                device=state.device,
-                dtype=torch.long,
-            ).squeeze()
+            return (
+                torch.tensor(
+                    [[list(env.action_spaces.values())[0].sample()]],
+                    device=state.device,
+                    dtype=torch.long,
+                )
+                .squeeze()
+                .item()
+            )
 
     def reset(self):
         self.steps = 0
