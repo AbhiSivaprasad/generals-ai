@@ -20,16 +20,9 @@ class RandomAgent(Agent):
 
         if len(valid_actions) > 0:
             action = random.choice(valid_actions)
+            return action.to_index()
         else:
-            action = Action(startx=0, starty=0, direction=Direction.UP)
-
-        # convert action to index
-        # this is a hack, make a cleaner interface
-        return (
-            action.startx * 4
-            + action.starty * board.num_cols * 4
-            + action.direction.value
-        )
+            return Action(do_nothing=True)
 
     def reset(self, seed=None):
         pass

@@ -43,7 +43,7 @@ class GameMaster:
         """
         # each player outputs a move given their view
         for moving_player_index, action in list(enumerate(actions)):
-            if action is None:
+            if action.do_nothing:
                 continue
 
             # check for validity of action

@@ -10,7 +10,6 @@ from src.environment.board_generator import generate_board_state
 from src.environment.game_master import GameMaster
 from src.environment.logger import Logger
 from src.training.input import (
-    convert_action_index_to_action,
     convert_state_to_array,
     get_input_channel_dimension_size,
 )
@@ -88,7 +87,7 @@ class GeneralsEnvironment(ParallelEnv):
     def step(self, actions):
         # Convert actions to the format expected by game_master
         game_actions = [
-            convert_action_index_to_action(actions[agent_index], self.board_x_size)
+            Action.from_index(actions[agent_index], self.board_x_size)
             for agent_index in range(len(self.agents))
         ]
 

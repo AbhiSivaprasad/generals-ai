@@ -39,7 +39,6 @@ from src.agents.curiousgeorge_agent import CuriousGeorgeAgent
 from src.training.dqn.dqn import DQN
 from src.training.input import (
     get_input_channel_dimension_size,
-    convert_action_index_to_action,
 )
 from src.training.dqn.replay_memory import ReplayMemory, Transition
 from src.environment.logger import Logger
@@ -76,7 +75,7 @@ N_HIDDEN_CONV_CHANNELS = 32
 KERNEL_SIZE = 2
 
 # %%
-N_ACTIONS = 4 * N_ROWS * N_COLUMNS
+N_ACTIONS = 4 * N_ROWS * N_COLUMNS + 1
 AUXILIARY_REWARD_WEIGHT = 0.1
 
 # %%
