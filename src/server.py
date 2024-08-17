@@ -10,13 +10,20 @@ ROOT_DIR = Path(__dirname__).parent
 app = Flask(__name__)
 
 
-@app.route("/replay/<replay_id>")
-def serve_replay(replay_id):
-    print("request for replay id:", replay_id)
-    replay_file = f"{replay_id}.json"
-    replay_path = ROOT_DIR / f"resources/replays/{replay_file}"
+@app.route("/replay/<path:replay_path>")
+def serve_replay(replay_path):
+    print("request for replay path:", replay_path)
 
-    with open(replay_path, "r") as file:
+    # Construct the full path
+    replay_full_path = ROOT_DIR / "resources/replays" / f"{replay_path}.json"
+
+    # Check if the file exists and is within the allowed directory
+    if not replay_full_path.is_file() or not replay_full_path.is_relative_to(
+        ROOT_DIR / "resources/replays"
+    ):
+        return "Replay not found", 404
+
+    with open(replay_full_path, "r") as file:
         r = make_response(file.read())
         r.headers["Access-Control-Allow-Origin"] = "*"
         return r

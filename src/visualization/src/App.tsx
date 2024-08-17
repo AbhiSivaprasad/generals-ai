@@ -5,7 +5,7 @@ import "typeface-quicksand"
 import { useData } from './api/utils';
 import Replay from './replay';
 import { CellState, BoardState } from './types/globals';
-import { useParams } from 'react-router-dom';
+import { useParams, useMatch } from 'react-router-dom';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 
 
@@ -26,7 +26,7 @@ function App() {
     return (
         <Router>
             <Routes>
-                <Route path="/replay/:replayId" element={<InnerApp/>} />
+                <Route path="/replay/*" element={<InnerApp/>} />
             </Routes>
         </Router>
     );
@@ -36,9 +36,10 @@ function App() {
 function InnerApp() {
     const [playerIndex, setPlayerIndex] = useState<number | null>(null);
     const [boardStates, setBoardStates] = useState<any[]>([]);
-    const { replayId } = useParams<{ replayId: string }>();
 
-    const replayData = useData(`/replay/${replayId}`);
+    const match = useMatch('/replay/*');
+    const replayPath = match?.pathname.split('/replay/')[1] || '';
+    const replayData = useData(`/replay/${replayPath}`);
 
     useEffect(() => {
         if(!replayData) return;
