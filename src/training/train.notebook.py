@@ -77,6 +77,7 @@ KERNEL_SIZE = 2
 
 # %%
 N_ACTIONS = 4 * N_ROWS * N_COLUMNS
+AUXILIARY_REWARD_WEIGHT = 0.1
 
 # %%
 policy_net = DQN(
@@ -99,7 +100,7 @@ target_net = DQN(
 ).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 env = GeneralsEnvironment(
-    players=[
+    agents=[
         CuriousGeorgeAgent(
             policy_net=policy_net,
             eps_start=EPS_START,
@@ -115,6 +116,7 @@ env = GeneralsEnvironment(
     ],
     board_x_size=N_COLUMNS,
     board_y_size=N_ROWS,
+    auxiliary_reward_weight=AUXILIARY_REWARD_WEIGHT,
 )
 
 # %%
@@ -150,35 +152,9 @@ steps_done = 0
 
 
 # %%
-# def plot_durations(show_result=False):
-#     plt.figure(1)
-#     durations_t = torch.tensor(episode_durations, dtype=torch.float)
-#     if show_result:
-#         plt.title("Result")
-#     else:
-#         plt.clf()
-#         plt.title("Training...")
-#     plt.xlabel("Episode")
-#     plt.ylabel("Duration")
-#     plt.plot(durations_t.numpy())
-#     # Take 100 episode averages and plot them too
-#     if len(durations_t) >= 100:
-#         means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
-#         means = torch.cat((torch.zeros(99), means))
-#         plt.plot(means.numpy())
-
-#     plt.pause(0.001)  # pause a bit so that plots are updated
-#     if is_ipython:
-#         if not show_result:
-#             display.display(plt.gcf())
-#             display.clear_output(wait=True)
-#         else:
-#             display.display(plt.gcf())
-
-# %%
 def optimize_model():
     if len(memory) < BATCH_SIZE:
-        return
+        return None
 
     transitions = memory.sample(BATCH_SIZE)
     batch = Transition(*zip(*transitions))
@@ -220,11 +196,16 @@ def optimize_model():
     # Optimize the model
     optimizer.zero_grad()
     loss.backward()
+
     # In-place gradient clipping
     torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
     optimizer.step()
 
-    return loss.detach().item()
+    # metrics
+    loss = loss.detach().item()
+    mean_reward = reward_batch.mean().item()
+    qvalue_norm = state_action_values.norm().item()
+    return loss, mean_reward, qvalue_norm
 
 
 # %%
@@ -243,13 +224,11 @@ for i_episode in range(num_episodes):
     # Initialize the environment and get its state
     state, info = env.reset(logger=logger)
     convert_agent_dict_to_tensor(state, device=device)
-    num_players = len(env.unwrapped.players)
+    num_agents = len(env.unwrapped.agents)
     for t in count():
         actions = {
-            agent_name: agent.move(state[agent_name], env).item()
-            for agent_name, agent in zip(
-                env.unwrapped.agent_name_by_player_index, env.unwrapped.players
-            )
+            agent_index: agent.move(state[agent_index], env)
+            for agent_index, agent in enumerate(env.unwrapped.agents)
         }
         observation, rewards, terminated, truncated, info = env.step(actions)
         convert_agent_dict_to_tensor(rewards, device=device)
@@ -278,12 +257,22 @@ for i_episode in range(num_episodes):
         state = next_state
 
         # Perform one step of the optimization (on the policy network)
-        loss = optimize_model()
+        metrics = optimize_model()
+        if metrics is not None:
+            minibatch_loss, minibatch_reward, minibatch_qvalue_norm = metrics
+            wandb.log(
+                {
+                    "step": global_step,
+                    "loss": minibatch_loss,
+                    "reward": minibatch_reward,
+                    "qvalue_norm": minibatch_qvalue_norm,
+                }
+            )
+
         legal_move_rate = list(info.values())[0]["is_game_action_legal"]
         wandb.log(
             {
                 "step": global_step,
-                "loss": loss,
                 "legal_move": int(legal_move_rate),
             }
         )
@@ -310,9 +299,3 @@ for i_episode in range(num_episodes):
 
 # %%
 # !find resources/replays -mindepth 1 -print0 | xargs -0 -P $(nproc) rm -rf
-
-# %%
-print("Complete")
-plot_durations(show_result=True)
-plt.ioff()
-plt.show()
