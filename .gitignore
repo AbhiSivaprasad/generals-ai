@@ -2,10 +2,12 @@
 botkit/**
 *.pyc
 .idea/**
-resources/replays/**
+resources/**
 src/__pycache__/**
 **/__pycache__/**
 src/training/models/**
 **/models/**
 **/legal_moves.csv
 .vscode/**
+wandb/
+
