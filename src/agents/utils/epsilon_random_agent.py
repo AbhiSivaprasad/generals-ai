@@ -19,10 +19,13 @@ class EpsilonRandomAgent(AgentWrapper):
     def move(self, state: GameState) -> Optional[Action]:
         move = self.agent.move(state)
         if self.rng.random() < self.epsilon:
-            return self.rng.choice(state.board.get_valid_actions(self.agent.player_index))
+            valid_actions = state.board.get_valid_actions(self.player_index)
+            if len(valid_actions) > 0:
+                return self.rng.choice(valid_actions)
+            else:
+                return None
         return move
 
     def reset(self, *args, seed = None, **kwargs) -> None:
         super().reset(seed=seed)
-        self.rng = np.random.default_rng(self.seed)
-        self.agent.reset(seed=seed)
+        self.rng = np.random.default_rng(seed)

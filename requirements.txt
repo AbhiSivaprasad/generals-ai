@@ -121,6 +121,7 @@ tifffile==2024.8.10
 timm==1.0.8
 torch==2.4.0
 torchrl==0.5.0
+torchsummary==1.5.1
 torchvision==0.19.0
 tqdm==4.66.5
 triton==3.0.0

@@ -20,8 +20,6 @@ class GymAgent(AgentWrapper):
     When given an `agent: Agent`, the `GymAgent` wrapper will use the given agent's `move()` logic to make moves; without an agent, the `GymAgent` will simply act as a pass-through for enacting actions passed to the environment's `step()` method.
     """
     action: Action = None
-    
-    agent: Agent
     env: gym.Env
     
     observation_space: Space
@@ -106,9 +104,8 @@ class GymAgent(AgentWrapper):
         offsets = np.random.default_rng(seed).integers(0, 32, n_runs)
         seeds = np.power(2, powers) + offsets
         for idx, seed in enumerate(seeds):
-            print("[INFO] Running episode ", idx)
             rewards = self.run_episode(int(seed))
             episode_len = len(rewards)
             rewards = np.array(rewards, dtype=np.float32) * np.power(self.gamma, np.arange(episode_len))
-            all_rewards.append(int(np.sum(rewards)))
+            all_rewards.append(int(rewards.sum()))
         return all_rewards

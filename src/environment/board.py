@@ -30,6 +30,9 @@ class Board:
         check if game is over
         :return: if unfinished return -1 else return player index of victory
         """
+        if self.generals[0] is None or self.generals[1] is None:
+            return -1
+        
         if self.generals[1].player_index == 0:  # player 0 captured player 1's general
             return 0
         elif self.generals[0].player_index == 1:  # player 1 captured player 0's general

@@ -10,6 +10,8 @@ from src.environment.gamestate import GameState
 from src.utils.replay_buffer import Experience, ReplayBuffer
 
 class QGreedyAgent(Agent):
+    q_function: Callable[[ObsType], List[Tuple[ActType, int]]] = None
+    
     def __init__(self, player_index: int, q_function: Callable[[ObsType], List[Tuple[ActType, int]]], *args, **kwargs):
         super().__init__(player_index, *args, **kwargs)
         self.q_function = q_function
@@ -20,10 +22,11 @@ class QGreedyAgent(Agent):
         best_action, q_value = max(q_values, key=lambda x: x[1])
         r, c = state.board.num_rows, state.board.num_cols
         best_action = Action.from_space_sample(best_action, r, c)
+        # print("[INFO] QGreedyAgent.move() BEST_ACTION: ", best_action)
         return best_action
     
     def reset(self, *args, **kwargs) -> None:
-        return super().reset(*args, **kwargs)
+        pass
     
 class QGreedyLearningAgent(QGreedyAgent, ObservationReceivingInterface):
     def __init__(
@@ -58,22 +61,24 @@ class DQNAgent(QGreedyAgent):
         super().__init__(player_index, self.get_q_function(), *args, **kwargs)
     
     def get_q_function(self):
+        device = self.device if self.device is not None else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         model = self.model
-        device = self.device
-        def q_function(observation: ObsType) -> List[Tuple[ActType, int]]:
+        if model is None:
+            return None
+        def qf(observation: ObsType) -> List[Tuple[ActType, int]]:
             turn, obs = observation
             rows, cols = obs.shape[0], obs.shape[1]
-            obs = torch.tensor(obs, dtype=torch.float32).to(device=device)
+            obs = torch.tensor(obs, dtype=torch.float32).to(device=device).unsqueeze(0)
             with torch.no_grad():
-                q_values = model(obs).detach().numpy()
+                q_values = model(obs).detach().cpu().numpy().flatten()
             return [(i, q_values[i]) for i in range(len(q_values))]
-        return q_function
+        return qf
     
     def update_model(self, model: torch.nn.Module, device: torch.device = None) -> None:
         self.model = model
         if device is not None:
             self.device = device
-            self.model.to(device)
+            self.model = self.model.to(device)
         self.q_function = self.get_q_function()
         
     

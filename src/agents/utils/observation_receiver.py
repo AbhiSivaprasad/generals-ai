@@ -1,4 +1,3 @@
-from abc import abstractmethod
 from typing import Callable, Dict, Tuple
 
 from src.agents.agent import Agent
@@ -7,10 +6,9 @@ from src.environment.gamestate import ObsType
 from src.utils.replay_buffer import Experience
 
 
-class ObservationReceivingInterface:
-    @abstractmethod
+class ObservationReceivingInterface(object):
     def observe(self, experience: Experience) -> None:
-        pass
+        raise NotImplementedError
     
 class ObservationReceiving(AgentWrapper, ObservationReceivingInterface):
     handler: Callable[[Experience], None]
