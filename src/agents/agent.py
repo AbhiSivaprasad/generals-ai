@@ -9,9 +9,9 @@ class Agent(ABC):
         self.player_index = player_index
 
     @abstractmethod
-    def move(self, state: torch.Tensor, env) -> Optional[int]:
+    def move(self, state: torch.Tensor, env) -> int:
         """
-        An agent returns None if there are no legal moves or if the agent wishes to wait
+        An agent returns an integer index representing the action it wants to take
         """
         pass
 
