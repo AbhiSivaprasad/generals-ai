@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Optional, Tuple
 
 
-class Direction(Enum):
+class Direction(int, Enum):
     UP = 0
     DOWN = 1
     LEFT = 2

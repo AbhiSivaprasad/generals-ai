@@ -26,6 +26,7 @@ class Replay extends Component {
 
     render() {
         return this.props.boardStates.length !== 0 && (
+            <>
                 <div>
                     <Board data={this.props.boardStates[this.state.time]} playerIndex={this.props.playerIndex} />
                     <PlayBar onAutoPlaySpeedClickFactory={this.onAutoPlaySpeedClickFactory}
@@ -35,7 +36,30 @@ class Replay extends Component {
                              onNextMoveClick={this.onNextMoveClick} />
                     turn: {this.state.time}
                 </div>
-            )
+                <table>
+                <tbody>
+                {
+                    Object.entries(this.props.infos[this.state.time]).map(([k, v]) => {
+                        return (
+                            <tr key={k}>
+                                <td>{k}</td>
+                                {
+                                    v.map(cell => {    
+                                        return (
+                                            <td>
+                                                {JSON.stringify(cell)}
+                                            </td>
+                                        )
+                                    })
+                                }
+                            </tr>
+                        )
+                    })
+                }
+                </tbody>
+                </table>
+            </>
+        )
     }
 
     onTick() {
