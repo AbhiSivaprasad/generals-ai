@@ -1,5 +1,6 @@
 from typing import Dict, Optional, Tuple
 import numpy as np
+from copy import deepcopy
 
 import gymnasium.core as gym
 from gymnasium.spaces import Space, \
@@ -89,12 +90,16 @@ class GeneralsEnvironment(gym.Env):
         The behaviour of this function depends primarily on the dynamics of the underlying
         environment.
         '''
-        self._prev_state = self.game.state
-        reward = 0.0
-        action = Action.from_space_sample(action, self.num_rows, self.num_cols)
+        self._prev_state = deepcopy(self.game.state)
+        
+        action_idx = action
+        action = Action.from_space_sample(action_idx, self.num_rows, self.num_cols)
         self.agent.set_action(action)
+        
+        reward = 0.0
         legal_move = self.game.state.board.is_action_valid(action, self.agent.player_index)
         reward += (1 - legal_move) * -1.0 # penalize illegal moves / invalid actions
+        
         new_game_state = self.game.step()
         new_obs = new_game_state.to_observation(self.agent.player_index)
 
@@ -102,9 +107,17 @@ class GeneralsEnvironment(gym.Env):
         if terminated:
             agentWon = self.game.state.board.terminal_status() == self.agent.player_index
             multiplier = 1.0 if agentWon else -1.0
-            reward += (multiplier * (0.1/(1.0-self.agent.gamma)))
+            reward += (multiplier * (0.1/(1.0 - self.agent.gamma)))
+            
+        info = {"opponent": self.opponent, "legal_move": legal_move, "game_state": self.game.state, "prev_state": self._prev_state}
         
-        return (new_obs, reward, terminated, False, {"opponent": self.opponent, "legal_move": legal_move, "game_state": self.game.state, "prev_state": self._prev_state})
+        self.game.logger.log_info("obs", self._prev_state.to_observation(self.agent.player_index), self._prev_state.turn)
+        self.game.logger.log_info("reward", reward, self._prev_state.turn)
+        self.game.logger.log_info("action_idx", action_idx, self._prev_state.turn)
+        self.game.logger.log_info("action", str(action), self._prev_state.turn)
+        self.game.logger.log_info("info", info, self._prev_state.turn)
+        
+        return (new_obs, reward, terminated, False, info)
     
     def write(self, path: str):
         '''

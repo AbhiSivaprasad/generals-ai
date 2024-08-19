@@ -23,6 +23,8 @@ function patch(board: BoardState, diffs: CellState[]) {
 function App() {
     const [playerIndex, setPlayerIndex] = useState<number | null>(null);
     const [boardStates, setBoardStates] = useState<any[]>([]);
+    const [infos, setInfos] = useState<any[]>([]);
+
 
     const replayData = useData("/replay");
 
@@ -47,6 +49,7 @@ function App() {
         }
 
         setBoardStates(allBoardStates);
+        setInfos(data.infos);
     }, [replayData]);
 
 
@@ -55,9 +58,9 @@ function App() {
     }
     return (
         <div>
-            <Replay boardStates={boardStates} playerIndex={playerIndex} />
             <button onClick={onViewButtonClick} value={0}>blue</button>
             <button onClick={onViewButtonClick} value={1}>red</button>
+            <Replay boardStates={boardStates} infos={infos || []} playerIndex={playerIndex} />
         </div>
     );
 }
