@@ -31,50 +31,23 @@ from collections import defaultdict
 from itertools import count
 import matplotlib.pyplot as plt
 from pathlib import Path
-import re
+import re, os
+from typing import List
+from tqdm import tqdm
+from src.utils.scheduler import ConstantHyperParameterSchedule
 
 # %%
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # %% [markdown]
-# ### Eval checkpoints against RandomAgent
+# ### Eval checkpoints against each other
 
 # %%
 N_ROWS = 2
 N_COLUMNS = 2
 
-# %%
-LOG_DIR = Path("./resources/replays/vs_random/")
-CHECKPOINT_DIR = Path("./resources/checkpoints")
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
-
 
 # %%
-def eval_checkpoint(checkpoint_path: Path, log_dir: Path, num_games: int = 100):
-    model = DQN.load_checkpoint(checkpoint_path, device=device)
-    agent = CuriousGeorgeAgent(model, train=False)
-    random_agent = RandomAgent(player_index=0)
-    env = GeneralsEnvironment(
-        agents=[random_agent, agent],
-        board_x_size=N_COLUMNS,
-        board_y_size=N_ROWS,
-    )
-
-    metrics = []
-    for i in range(num_games):
-        logger = Logger()
-        metrics.append(simulate_game(env, logger))
-        logger.write(log_dir / f"{i}.json")
-
-    # compute overall stats
-    overall_metrics = {}
-    overall_metrics["duration"] = np.mean([m[1]["duration"] for m in metrics])
-    overall_metrics["reward"] = np.mean([m[1]["reward"] for m in metrics])
-    overall_metrics["win_rate"] = np.mean([m[1]["won"] for m in metrics])
-    return overall_metrics
-
-
 def simulate_game(env, logger: Logger):
     """Simulate a game between players and return the total reward collected, duration, and which player won"""
     # Initialize the environment and get its state
@@ -109,6 +82,143 @@ def simulate_game(env, logger: Logger):
                 metrics[agent_index]["won"] = status
                 metrics[agent_index]["duration"] = t
             return metrics
+
+
+# %%
+def get_checkpoint_numbers(directory):
+    if not os.path.isdir(directory):
+        raise ValueError(f"{directory} is not a valid directory.")
+
+    pattern = re.compile(r"checkpoint_(\d+)\.pth")
+    checkpoint_numbers = []
+
+    for filename in os.listdir(directory):
+        match = pattern.match(filename)
+        if match:
+            number = int(match.group(1))
+            checkpoint_numbers.append(number)
+
+    checkpoint_numbers.sort()
+    return checkpoint_numbers
+
+
+# %%
+def eval_checkpoints(
+    checkpoint_dir: Path,
+    checkpoint_numbers: List[int],
+    base_log_dir: Path,
+    num_games: int = 100,
+):
+    models = [
+        DQN.load_checkpoint(
+            checkpoint_dir / f"checkpoint_{checkpoint_number}.pth", device=device
+        )
+        for checkpoint_number in checkpoint_numbers
+    ]
+    metrics_by_checkpoint = defaultdict(lambda: defaultdict(list))
+    for i in tqdm(range(len(models))):
+        for j in range(i + 1, len(models)):
+            agent1 = CuriousGeorgeAgent(
+                models[i],
+                epsilon_schedule=ConstantHyperParameterSchedule(0.1),
+            )
+            agent2 = CuriousGeorgeAgent(
+                models[j],
+                epsilon_schedule=ConstantHyperParameterSchedule(0.1),
+            )
+            env = GeneralsEnvironment(
+                agents=[agent1, agent2],
+                board_x_size=N_COLUMNS,
+                board_y_size=N_ROWS,
+            )
+            log_dir = (
+                base_log_dir / f"{checkpoint_numbers[i]}_vs_{checkpoint_numbers[j]}"
+            )
+            log_dir.mkdir(parents=True, exist_ok=True)
+
+            metrics = []
+            for k in range(num_games):
+                logger = Logger()
+                metrics.append(simulate_game(env, logger))
+                logger.write(log_dir / f"{k}.json")
+
+            # compute overall stats
+            metrics_by_checkpoint[checkpoint_numbers[i]]["duration"].extend(
+                [m[0]["duration"] for m in metrics]
+            )
+            metrics_by_checkpoint[checkpoint_numbers[i]]["reward"].extend(
+                [m[0]["reward"] for m in metrics]
+            )
+            metrics_by_checkpoint[checkpoint_numbers[i]]["win_rate"].extend(
+                [m[0]["won"] for m in metrics]
+            )
+            metrics_by_checkpoint[checkpoint_numbers[j]]["duration"].extend(
+                [m[1]["duration"] for m in metrics]
+            )
+            metrics_by_checkpoint[checkpoint_numbers[j]]["reward"].extend(
+                [m[1]["reward"] for m in metrics]
+            )
+            metrics_by_checkpoint[checkpoint_numbers[j]]["win_rate"].extend(
+                [m[1]["won"] for m in metrics]
+            )
+
+    overall_metrics = defaultdict(dict)
+    for checkpoint_number, metrics in metrics_by_checkpoint.items():
+        for metric_name, values in metrics.items():
+            overall_metrics[checkpoint_number][metric_name] = np.mean(values)
+
+    return overall_metrics
+
+
+# %%
+checkpoint_dir = Path("./resources/checkpoints")
+checkpoint_numbers = get_checkpoint_numbers(checkpoint_dir)
+checkpoint_numbers = [c for c in checkpoint_numbers if c % 4000 == 0]
+
+# %%
+overall_metrics = eval_checkpoints(
+    checkpoint_dir=checkpoint_dir,
+    checkpoint_numbers=checkpoint_numbers,
+    base_log_dir=Path("./resources/replays/tournament/"),
+    num_games=15,
+)
+
+# %%
+overall_metrics
+
+# %% [markdown]
+# ### Eval checkpoints against RandomAgent
+
+# %%
+LOG_DIR = Path("./resources/replays/vs_random/")
+CHECKPOINT_DIR = Path("./resources/checkpoints")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# %%
+def eval_checkpoint(checkpoint_path: Path, log_dir: Path, num_games: int = 100):
+    model = DQN.load_checkpoint(checkpoint_path, device=device)
+    agent = CuriousGeorgeAgent(model, train=False)
+    random_agent = RandomAgent(player_index=0)
+    env = GeneralsEnvironment(
+        agents=[random_agent, agent],
+        board_x_size=N_COLUMNS,
+        board_y_size=N_ROWS,
+    )
+
+    metrics = []
+    for i in range(num_games):
+        logger = Logger()
+        metrics.append(simulate_game(env, logger))
+        logger.write(log_dir / f"{i}.json")
+
+    # compute overall stats
+    overall_metrics = {}
+    overall_metrics["duration"] = np.mean([m[1]["duration"] for m in metrics])
+    overall_metrics["reward"] = np.mean([m[1]["reward"] for m in metrics])
+    overall_metrics["win_rate"] = np.mean([m[1]["won"] for m in metrics])
+    return overall_metrics
 
 
 # %%

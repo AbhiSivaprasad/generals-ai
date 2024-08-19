@@ -14,13 +14,21 @@ class GameMaster:
     handles game state
     """
 
-    def __init__(self, board: Board, players, max_turns=None, logger: Logger = None):
+    def __init__(
+        self,
+        board: Board,
+        players,
+        max_turns=None,
+        n_turns_before_land_army_increments: int = 50,
+        logger: Logger = None,
+    ):
         self.board = board
         self.board.player_index = None
         self.logger = logger
         self.players = players
         self.turn = 0
         self.max_turns = max_turns
+        self.n_turns_before_land_army_increments = n_turns_before_land_army_increments
 
         if self.logger is not None:
             # log initial board configuration
@@ -73,7 +81,11 @@ class GameMaster:
                     tile.player_index is not None
                     and (
                         tile.type == TileType.CITY
-                        or (tile.type == TileType.NORMAL and self.turn % (25 * 2) == 0)
+                        or (
+                            tile.type == TileType.NORMAL
+                            and self.turn % self.n_turns_before_land_army_increments
+                            == 0
+                        )
                     )
                 ):
                     tile.army += 1

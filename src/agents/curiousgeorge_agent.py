@@ -12,16 +12,16 @@ class CuriousGeorgeAgent(Agent):
     def __init__(
         self,
         policy_net: torch.nn.Module,
-        episilon_schedule: HyperParameterSchedule = ConstantHyperParameterSchedule(0),
+        epsilon_schedule: HyperParameterSchedule = ConstantHyperParameterSchedule(0),
     ):
         self.steps = 0
         self.policy_net = policy_net
-        self.epsion_schedule = episilon_schedule
+        self.epsilon_schedule = epsilon_schedule
 
     def move(self, state: torch.Tensor, env: GeneralsEnvironment):
         sample = random.random()
         self.steps += 1
-        eps_threshold = self.episilon_schedule.get(self.steps)
+        eps_threshold = self.epsilon_schedule.get(self.steps)
         if sample > eps_threshold:
             with torch.no_grad():
                 # argmax returns the indices of the maximum values along the specified dimension

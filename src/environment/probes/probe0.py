@@ -78,9 +78,11 @@ class ProbeZeroEnvironment(ParallelEnv):
         # reset agent states
         for agent in self.agents:
             agent.reset()
+
+        # set initial observation
         observations = self._get_observations()
-        infos = {agent_index: {} for agent_index in range(len(self.agents))}
         self.initial_observations = observations
+        infos = {agent_index: {} for agent_index in range(len(self.agents))}
         return observations, infos
 
     def step(self, actions):
@@ -94,7 +96,7 @@ class ProbeZeroEnvironment(ParallelEnv):
         self.game_master.step(game_actions)
         self.n_step += 1
 
-        observations = self._get_observations()
+        observations = self.initial_observations
         rewards = self._get_rewards()
         terminations = self._get_terminations()
         truncations = self._get_truncations()
@@ -102,7 +104,15 @@ class ProbeZeroEnvironment(ParallelEnv):
         return observations, rewards, terminations, truncations, infos
 
     def _get_observations(self):
-        return self.initial_observations
+        observation = convert_state_to_array(
+            self.game_master.board,
+            len(self.agents),
+            fog_of_war=self.use_fog_of_war,
+        )
+        return {
+            agent_index: observation[agent_index]
+            for agent_index in range(len(self.agents))
+        }
 
     def _get_rewards(self):
         return {agent_index: 1 for agent_index in range(len(self.agents))}
