@@ -23,7 +23,7 @@ def convert_state_to_array_for_player(
             for row in state.grid
             for tile in row
         ]
-    ).reshape(-1, state.num_rows, state.num_cols)
+    ).T.reshape(-1, state.num_rows, state.num_cols)
     return state_array
 
 
