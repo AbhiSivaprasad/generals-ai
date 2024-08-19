@@ -28,7 +28,9 @@ class DQN(nn.Module):
             *[
                 nn.Sequential(
                     nn.Conv2d(encoder_dim, encoder_dim, kernel_size=1, padding="same"), 
+                    nn.Conv2d(encoder_dim, encoder_dim, kernel_size=3, padding="same"), 
                     LayerNorm(encoder_dim, eps=1e-6, data_format="channels_first"),
+                    nn.ReLU(),
                     nn.Dropout2d(p=spatial_dropout)
                 )
                 for _ in range(encoder_depth)
@@ -41,6 +43,7 @@ class DQN(nn.Module):
             nn.Conv2d(block_dim, block_dim // 2, kernel_size=3, padding=1, stride=2),
             nn.Dropout2d(p=spatial_dropout),
             ConvNeXtBlock(block_dim // 2),
+            nn.ReLU(),
             nn.Conv2d(block_dim // 2, block_dim // 4, kernel_size=3, padding=1),
             LayerNorm(block_dim // 4, eps=1e-6, data_format="channels_first"),
         )
@@ -50,7 +53,7 @@ class DQN(nn.Module):
             nn.Flatten(),
             nn.Linear(fc_dim, fc_dim),
             nn.Linear(fc_dim, fc_dim),
-            nn.GELU(),
+            nn.PReLU(),
             nn.Linear(fc_dim, fc_dim),
             nn.Linear(fc_dim, num_actions)
         )

@@ -11,6 +11,7 @@ import numpy as np
 import ray
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import wandb
@@ -140,13 +141,16 @@ class EnvRunner:
         agent = ObservationReceiving(agent, observation_handler=self._handle_observation)
         self.env = gym.make("generals-v0", agent=agent, opponent=opponent, seed=config.seed, n_rows=config.n_rows, n_cols=config.n_cols)
         self.agent: GymAgent = self.env.agent
+        self.agent.set_env(self.env)
         
     def _fetch_updates(self):
         if isinstance(self.agent.unwrapped, DQNAgent):
             dqn_agent: DQNAgent = self.agent.unwrapped
-            model: torch.nn.Module = DQN(config.input_channels, config.num_actions, config.n_rows, config.n_cols).cuda().eval()
+            model = dqn_agent.model
+            if dqn_agent.model is None:
+                model: torch.nn.Module = DQN(config.input_channels, config.num_actions, config.n_rows, config.n_cols).cuda().eval()
+                dqn_agent.update_model(model, device=torch.device("cuda"))
             model.load_state_dict(ray.get(self.server.get_target_net.remote()))
-            dqn_agent.update_model(model, device=torch.device("cuda"))
             gc.collect()
             torch.cuda.empty_cache() 
     
@@ -159,6 +163,7 @@ class EnvRunner:
         while True:
             train_steps = ray.get(self.server.get_training_steps.remote())
             if train_steps - last_train_steps >= self.config.target_update_freq:
+                print("[INFO] Fetching target network updates...")
                 self._fetch_updates()
                 last_train_steps = train_steps
             agent_seed = rng.integers(0, 2**29)   
@@ -178,10 +183,13 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
     policy_net = DQN(config.input_channels, config.num_actions, config.n_rows, config.n_cols).cuda().train()
     policy_net.load_state_dict(target_net.state_dict())
     
-    optimizer = optim.AdamW(policy_net.parameters(), lr=config.learning_rate)
+    optimizer = optim.SGD(policy_net.parameters(), lr=config.learning_rate)
     
     val_env_rand: GeneralsEnvironment = gym.make("generals-v0", agent=DQNAgent(0, policy_net.cuda(), None), opponent=RandomAgent(1, config.seed + (config.seed % 13) + 2 ** (config.seed % 19)), seed=config.seed, n_rows=config.n_rows, n_cols=config.n_cols)
     val_env_humanexe: GeneralsEnvironment = gym.make("generals-v0", agent=DQNAgent(0, policy_net.cuda(), None), opponent=HumanExeAgent(1), seed=config.seed, n_rows=config.n_rows, n_cols=config.n_cols)
+    
+    val_env_rand.agent.set_env(val_env_rand)
+    val_env_humanexe.agent.set_env(val_env_humanexe)
     
     print("Waiting for buffer to fill...")
     size = ray.get(buffer.size.remote())
@@ -199,10 +207,11 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
     losses = []
     print("Starting training...")
     for train_step in trange(config.num_steps, miniters=20):
-        print("Training step:", train_step, ray.get(server.increment_training_steps.remote()))
+        ray.get(server.increment_training_steps.remote())
+        print("Training step:", train_step)
         
         data = ray.get(buffer.sample.remote(config.batch_size))
-        experience_batch  = tuple([list(t) for t in zip(*data)])
+        experience_batch = tuple([list(t) for t in zip(*data)])
         s_t, a_t, r_t_1, s_t_1, d_t_1 = experience_batch
         # print("[INFO] Sampled experience batch: ", experience_batch)
         
@@ -221,11 +230,11 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
         a_t = [int(a) for a in a_t]
         r_t_1 = torch.tensor(r_t_1, dtype=torch.float32).cuda()
         d_t_1 = torch.tensor(d_t_1, dtype=torch.float32).cuda()
+        policy_net_target_q_value = policy_net_target_q_value.cuda()
         
         predicted_q_vals: torch.Tensor = policy_net(s_t)[:config.batch_size, a_t]
 
-        td_error = r_t_1 + config.gamma * policy_net_target_q_value * (1 - d_t_1) - predicted_q_vals
-        loss = td_error.pow(2).mean()
+        loss = F.huber_loss(predicted_q_vals, r_t_1 + config.gamma * policy_net_target_q_value * (1 - d_t_1))
         losses.append(loss.item())
         loss.backward()
         
@@ -233,11 +242,14 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
         optimizer.zero_grad()
         
         if config.use_wandb:
-            grad_norm = torch.norm(torch.nn.utils.parameters_to_vector(policy_net.parameters()), 2.0)
-            grad_max = torch.max(torch.nn.utils.parameters_to_vector(policy_net.parameters()))
+            grad_norm = torch.norm(nn.utils.parameters_to_vector(policy_net.parameters()), 2.0)
+            grad_max = torch.max(nn.utils.parameters_to_vector(policy_net.parameters()))
             wandb.log({
                 "loss": loss.item(),
-                "q_values": predicted_q_vals.max().item(),
+                "q_values_max": predicted_q_vals.max().item(),
+                "q_values_min": predicted_q_vals.min().item(),
+                "q_values_mean": predicted_q_vals.mean().item(),
+                "batch_reward_mean": r_t_1.mean().item(),
                 "SPS": int(train_step / (time.time() - start_time)),
                 "grad_norm": grad_norm.item(),
                 "grad_max": grad_max.item()
@@ -251,11 +263,24 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
         
         if (train_step + 1) % (config.num_steps // 100) == 0:
             print("[INFO] Running validation episodes...")
+            if isinstance(val_env_rand.agent.unwrapped, DQNAgent):
+                dqn_agent: DQNAgent = val_env_rand.agent.unwrapped
+                dqn_agent.update_model(policy_net, device=torch.device("cuda"))
+            if isinstance(val_env_humanexe.agent.unwrapped, DQNAgent):
+                dqn_agent: DQNAgent = val_env_humanexe.agent.unwrapped
+                dqn_agent.update_model(policy_net, device=torch.device("cuda"))
+
+            gc.collect()
+            torch.cuda.empty_cache() 
+            
             val_env_rand.reset()
             val_env_humanexe.reset()
-            reward_rand = np.array(val_env_rand.agent.run_episodes(seed=config.seed, n_runs=2)).mean()
-            reward_humanexe = np.array(val_env_humanexe.agent.run_episodes(seed=config.seed, n_runs=2)).mean()
+            reward_rand = float(val_env_rand.agent.run_episode(config.seed))
+            reward_humanexe = float(val_env_humanexe.agent.run_episode(config.seed))
             print("[INFO] Validation rewards: ", reward_rand, "--", reward_humanexe)
+            
+            val_env_rand.write("val_rand_episode_" + str(train_step) + ".txt")
+            val_env_humanexe.write("val_humanexe_episode_" + str(train_step) + ".txt")
             
             if config.use_wandb:
                 wandb.log({
@@ -311,14 +336,14 @@ if __name__ == "__main__":
         c.seed = 2**(i % 29) + 2 * i + 1
     
     env_runners = []
-    env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 20)])
-    time.sleep(10)
-    env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 10)])
-    time.sleep(10)
-    env_runners.extend([EnvRunner.options(num_gpus=0.05).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.3, c.seed), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 10)])
+    # env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 20)])
+    # time.sleep(10)
+    # env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 10)])
+    # time.sleep(10)
+    env_runners.extend([EnvRunner.options(num_gpus=0.05).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.3, c.seed), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 20)])
     time.sleep(10)
     env_runners.extend([EnvRunner.options(num_gpus=0.05).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.3, c.seed + 2**7 - 1), opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 30)])
-    
+    time.sleep(10)
     
     run_tasks = [runner.run.remote() for runner in env_runners]
     

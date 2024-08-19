@@ -57,7 +57,7 @@ class GeneralsEnvironment(gym.Env):
         self.mountain_probability, self.city_probability = mountain_probability, city_probability
         self.min_ratio_of_generals_distance_to_board_side = min_ratio_of_generals_distance_to_board_side
         
-        self.agent = GymAgent(env=self) if agent is None else GymAgent(agent=agent, env=self)
+        self.agent = GymAgent() if agent is None else GymAgent(agent=agent)
         self.opponent = opponent
                 
         self.reset(seed=seed)
@@ -107,6 +107,12 @@ class GeneralsEnvironment(gym.Env):
             reward += (multiplier * (0.1/(1.0-self.agent.gamma)))
         
         return (new_obs, reward, terminated, False, {"opponent": self.opponent, "legal_move": legal_move, "game_state": self.game.state, "prev_state": self._prev_state})
+    
+    def write(self, path: str):
+        '''
+        Write the environment to a file.
+        '''
+        self.game.logger.write(path)
 
             
 from gymnasium.envs.registration import register

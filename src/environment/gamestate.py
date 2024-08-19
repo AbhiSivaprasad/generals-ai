@@ -19,9 +19,9 @@ class GameState(object):
     def to_observation(self, player_index: int, fog_of_war: bool = True) -> ObsType:
         state = self
         # [army, 1-hot general, 1-hot city, 1-hot mountain, 1-hot in-bounds, 0/1 is_mine, 0/1 visible
-        obs = np.zeros((MAX_SIZE[0], MAX_SIZE[1], 7), dtype=np.float32)
         board_r, board_c = len(state.board.grid), len(state.board.grid[0])
-        for r, c in cartesian(range(MAX_SIZE[0]), range(MAX_SIZE[1])):
+        obs = np.zeros((board_r, board_c, 7), dtype=np.float32)
+        for r, c in cartesian(range(board_r), range(board_c)):
             if 0 <= r < board_r and 0 <= c < board_c:
                 tile = state.board.grid[r][c]
                 obs[r, c, 4] = 1

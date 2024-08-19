@@ -45,8 +45,8 @@ class QGreedyLearningAgent(QGreedyAgent, ObservationReceivingInterface):
         self.obs_handler(experience)
 
 class DQNAgent(QGreedyAgent):
-    model: torch.nn.Module
-    device: torch.device
+    model: Optional[torch.nn.Module]
+    device: Optional[torch.device]
     
     def __init__(
         self, 

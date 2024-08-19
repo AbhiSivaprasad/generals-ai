@@ -15,6 +15,7 @@ class GameMaster:
     players: List[Agent]
     state: GameState
     max_turns: Optional[int]
+    logger: Optional[Logger]
 
     def __init__(self, board: Board, players: List[Agent], max_turns=None, logger:Logger=None):
         self.logger = logger
@@ -27,7 +28,7 @@ class GameMaster:
             self.logger.init(self.state.board)
     
     def step(self) -> GameState:
-        if self.state.board.terminal_status() != -1 or (self.max_turns is not None and self.state.turn < self.max_turns):
+        if self.state.board.terminal_status() != -1 or (self.max_turns is not None and self.state.turn >= self.max_turns):
             return self.state
         
         # each player outputs a move given their view

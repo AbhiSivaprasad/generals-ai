@@ -89,7 +89,7 @@ class GymAgent(AgentWrapper):
                 self.agent.observe(experience)
             rewards.append(reward)
             obs = new_obs
-        return rewards
+        return float((np.array(rewards) * np.power(self.gamma, np.arange(len(rewards)))).sum())
     
     def run_episodes(self, seed, n_runs=500):
         '''
@@ -104,8 +104,6 @@ class GymAgent(AgentWrapper):
         offsets = np.random.default_rng(seed).integers(0, 32, n_runs)
         seeds = np.power(2, powers) + offsets
         for idx, seed in enumerate(seeds):
-            rewards = self.run_episode(int(seed))
-            episode_len = len(rewards)
-            rewards = np.array(rewards, dtype=np.float32) * np.power(self.gamma, np.arange(episode_len))
-            all_rewards.append(int(rewards.sum()))
+            reward = self.run_episode(int(seed))
+            all_rewards.append(float(reward))
         return all_rewards
