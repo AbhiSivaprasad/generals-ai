@@ -34,6 +34,7 @@ import torch.nn.functional as F
 
 # %%
 from src.environment.environment import GeneralsEnvironment
+from src.environment.probes.probe0 import ProbeZeroEnvironment
 from src.agents.random_agent import RandomAgent
 from src.agents.curiousgeorge_agent import CuriousGeorgeAgent
 from src.training.dqn.dqn import DQN
@@ -43,6 +44,7 @@ from src.training.input import (
 from src.training.dqn.replay_memory import ReplayMemory, Transition
 from src.environment.logger import Logger
 from src.training.utils import convert_agent_dict_to_tensor
+from src.utils.scheduler import ExponentialHyperParameterSchedule
 
 # %%
 # set up matplotlib
@@ -58,7 +60,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # %%
 BATCH_SIZE = 128  # replay buffer sample size
-GAMMA = 0.99
+GAMMA = 0.95
 EPS_START = 0.9
 EPS_END = 0.05
 EPS_DECAY = 1000  # higher means slower exponential decay
@@ -102,15 +104,15 @@ env = GeneralsEnvironment(
     agents=[
         CuriousGeorgeAgent(
             policy_net=policy_net,
-            eps_start=EPS_START,
-            eps_end=EPS_END,
-            eps_decay=EPS_DECAY,
+            epsilon_schedule=ExponentialHyperParameterSchedule(
+                initial_value=eps_start, final_value=eps_end, decay_rate=eps_decay
+            ),
         ),
         CuriousGeorgeAgent(
             policy_net=policy_net,
-            eps_start=EPS_START,
-            eps_end=EPS_END,
-            eps_decay=EPS_DECAY,
+            epsilon_schedule=ExponentialHyperParameterSchedule(
+                initial_value=eps_start, final_value=eps_end, decay_rate=eps_decay
+            ),
         ),
     ],
     board_x_size=N_COLUMNS,
@@ -165,7 +167,7 @@ def optimize_model():
         device=device,
         dtype=torch.bool,
     )
-    non_final_next_states = torch.stack([s for s in batch.next_state if s is not None])
+
     state_batch = torch.stack(batch.state)
     action_batch = torch.stack(batch.action)
     reward_batch = torch.stack(batch.reward)
@@ -175,16 +177,24 @@ def optimize_model():
     # for each batch state according to policy_net
     state_action_values = policy_net(state_batch).gather(1, action_batch.unsqueeze(1))
 
-    # Compute V(s_{t+1}) for all next states.
-    # Expected values of actions for non_final_next_states are computed based
-    # on the "older" target_net; selecting their best reward with max(1).values
-    # This is merged based on the mask, such that we'll have either the expected
-    # state value or 0 in case the state was final.
-    next_state_values = torch.zeros(BATCH_SIZE, device=device)
-    with torch.no_grad():
-        next_state_values[non_final_mask] = (
-            target_net(non_final_next_states).max(1).values
-        )
+    # look up our prediction for value of next state if its not a final state
+    non_final_next_states = [s for s in batch.next_state if s is not None]
+    if len(non_final_next_states) == 0:
+        next_state_values = torch.zeros(BATCH_SIZE, device=device)
+    else:
+        non_final_next_states = torch.stack(non_final_next_states)
+
+        # Compute V(s_{t+1}) for all next states.
+        # Expected values of actions for non_final_next_states are computed based
+        # on the "older" target_net; selecting their best reward with max(1).values
+        # This is merged based on the mask, such that we'll have either the expected
+        # state value or 0 in case the state was final.
+        next_state_values = torch.zeros(BATCH_SIZE, device=device)
+        with torch.no_grad():
+            next_state_values[non_final_mask] = (
+                target_net(non_final_next_states).max(1).values
+            )
+
     # Compute the expected Q values
     expected_state_action_values = (next_state_values * GAMMA) + reward_batch
 
@@ -202,9 +212,9 @@ def optimize_model():
 
     # metrics
     loss = loss.detach().item()
-    mean_reward = reward_batch.mean().item()
-    qvalue_norm = state_action_values.norm().item()
-    return loss, mean_reward, qvalue_norm
+    mean_reward = reward_batch.abs().mean().item()
+    qvalue_magnitude = state_action_values.abs().mean().item()
+    return loss, mean_reward, qvalue_magnitude
 
 
 # %%
@@ -214,9 +224,9 @@ CHECKPOINT_DIR = Path("resources/checkpoints")
 LOG_DIR.mkdir(exist_ok=True, parents=True)
 
 # %%
-num_episodes = 1000
-log_interval = 50
-checkpoint_interval = 50
+num_episodes = 50000
+log_interval = 200
+checkpoint_interval = 200
 global_step = 0
 for i_episode in range(num_episodes):
     logger = Logger()
@@ -258,22 +268,24 @@ for i_episode in range(num_episodes):
         # Perform one step of the optimization (on the policy network)
         metrics = optimize_model()
         if metrics is not None:
-            minibatch_loss, minibatch_reward, minibatch_qvalue_norm = metrics
+            minibatch_loss, minibatch_reward_magnitude, minibatch_qvalue_magnitude = (
+                metrics
+            )
             wandb.log(
                 {
-                    "step": global_step,
                     "loss": minibatch_loss,
-                    "reward": minibatch_reward,
-                    "qvalue_norm": minibatch_qvalue_norm,
-                }
+                    "reward_magnitude": minibatch_reward_magnitude,
+                    "qvalue_magnitude": minibatch_qvalue_magnitude,
+                },
+                step=global_step,
             )
 
         legal_move_rate = list(info.values())[0]["is_game_action_legal"]
         wandb.log(
             {
-                "step": global_step,
                 "legal_move": int(legal_move_rate),
-            }
+            },
+            step=global_step,
         )
 
         # Soft update of the target network's weights
@@ -287,7 +299,7 @@ for i_episode in range(num_episodes):
         target_net.load_state_dict(target_net_state_dict)
 
         if done:
-            wandb.log({"step": global_step, "duration": t})
+            wandb.log({"duration": t, "episode": i_episode}, step=global_step)
             if i_episode % checkpoint_interval == 0:
                 policy_net.save_checkpoint(CHECKPOINT_DIR, i_episode)
             if i_episode % log_interval == 0:
