@@ -31,9 +31,9 @@ def convert_tile_to_array(tile: Tile, player_index: int, fog_of_war: bool):
     tile_state = np.zeros(get_input_channel_dimension_size(fog_of_war), dtype=np.int32)
     has_vision = tile.player_visibilities[player_index] or not fog_of_war
 
-    # indices 0, 1 represents player 0, 1
+    # indices 0, 1 represents my tile, opponent's tile
     if tile.player_index is not None:
-        tile_state[tile.player_index] = 1
+        tile_state[int(tile.player_index != player_index)] = 1
 
     # index 2 represents the number of troops on the tile
     tile_state[2] = tile.army if tile.army is not None else 0
