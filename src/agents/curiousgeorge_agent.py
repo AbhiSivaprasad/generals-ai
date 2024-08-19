@@ -17,12 +17,13 @@ class CuriousGeorgeAgent(Agent):
         self.steps = 0
         self.policy_net = policy_net
         self.epsilon_schedule = epsilon_schedule
+        self.epsilon = self.epsilon_schedule.get(0)
 
     def move(self, state: torch.Tensor, env: GeneralsEnvironment):
         sample = random.random()
         self.steps += 1
-        eps_threshold = self.epsilon_schedule.get(self.steps)
-        if sample > eps_threshold:
+        self.epsilon = self.epsilon_schedule.get(self.steps)
+        if sample > self.epsilon:
             with torch.no_grad():
                 # argmax returns the indices of the maximum values along the specified dimension
                 return self.policy_net(state).argmax(dim=1).squeeze().item()

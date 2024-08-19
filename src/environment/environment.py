@@ -28,6 +28,7 @@ class GeneralsEnvironment(ParallelEnv):
         city_probability: float = 0.0,
         use_fog_of_war: bool = False,
         auxiliary_reward_weight: float = 0.01,
+        normal_tile_increment_frequency: int = 50,
     ):
         self.agents = agents
         self.max_turns = max_turns
@@ -38,6 +39,7 @@ class GeneralsEnvironment(ParallelEnv):
         self.use_fog_of_war = use_fog_of_war
         self.n_step = 0
         self.auxiliary_reward_weight = auxiliary_reward_weight
+        self.normal_tile_increment_frequency = normal_tile_increment_frequency
 
         # Define action and observation spaces
         self.action_spaces = {
@@ -71,6 +73,7 @@ class GeneralsEnvironment(ParallelEnv):
             players=self.agents,
             logger=logger,
             max_turns=self.max_turns,
+            normal_tile_increment_frequency=self.normal_tile_increment_frequency,
         )
         self.previous_agent_scores = {
             agent_index: 0 for agent_index in range(len(self.agents))

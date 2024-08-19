@@ -35,9 +35,71 @@ import re, os
 from typing import List
 from tqdm import tqdm
 from src.utils.scheduler import ConstantHyperParameterSchedule
+from src.environment.board import Board
+from src.environment.tile import TileType, Tile
+from src.training.input import convert_state_to_array, convert_tile_to_array
+from src.environment.action import Action, Direction
 
 # %%
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# %%
+model = DQN.load_checkpoint(
+    Path("/home/ubuntu/generals-ai/resources/checkpoints/checkpoint_1200.pth")
+).to(device)
+
+# %% [markdown]
+# ### Probe probability
+
+# %% [markdown]
+# Handcraft a board state with an optimal move, and track model's performance over time on board state
+
+# %%
+board = Board(num_rows=2, num_cols=2)
+
+# %%
+board_state = [
+    [(TileType.GENERAL, 0, 1), (TileType.NORMAL, None, None)],
+    [(TileType.NORMAL, 0, 4), (TileType.GENERAL, 1, 1)],
+]
+
+# %%
+grid = []
+for y, row_state in enumerate(board_state):
+    row_tiles = []
+    for x, tile_state in enumerate(row_state):
+        tile = Tile(board, x, y)
+        tile.type = tile_state[0]
+        tile.player_index = tile_state[1]
+        tile.army = tile_state[2]
+        row_tiles.append(tile)
+
+        if tile.type == TileType.GENERAL:
+            board.generals[tile.player_index] = tile
+        elif tile.type == TileType.CITY:
+            board.cities[tile.player_index].append(tile)
+
+    grid.append(row_tiles)
+
+# %%
+board.set_grid(grid)
+
+# %%
+state = convert_state_to_array(board, 2, False)
+
+# %%
+state = torch.tensor(state, dtype=torch.float32, device=device)
+
+# %%
+optimal_action = Action(do_nothing=False, startx=0, starty=1, direction=Direction.RIGHT)
+optimal_action_index = optimal_action.to_index(n_columns=board.num_cols)
+
+# %%
+state_action_values = model(state)[0]
+state_action_values = state_action_values / state_action_values.norm()
+
+# %%
+state_action_values[optimal_action_index].item()
 
 # %% [markdown]
 # ### Eval checkpoints against each other

@@ -9,7 +9,7 @@ class Board:
     Board a representation of the board with necessary helper methods
     """
 
-    def __init__(self, num_rows: int, num_cols: int, player_index: int):
+    def __init__(self, num_rows: int, num_cols: int):
         self.num_rows = num_rows
         self.num_cols = num_cols
         self.cities: List[Tile] = []

@@ -58,6 +58,10 @@ class DQN(nn.Module):
         self.output_head = nn.Sequential(
             nn.Flatten(),
             nn.Linear(n_output_rows * n_output_columns, n_actions),
+            nn.ReLU(),
+            nn.Linear(n_actions, n_actions),
+            nn.ReLU(),
+            nn.Linear(n_actions, n_actions),
         )
 
     def forward(self, x):
