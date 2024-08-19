@@ -5,8 +5,8 @@ from typing import List
 
 from src.environment.board import Board
 from src.environment.logger import Logger
-from src.environment.tile import Tile, TileType
-from src.environment.action import Action, convert_direction_to_vector
+from src.environment.tile import TileType
+from src.environment.action import Action
 
 
 class GameMaster:
@@ -19,7 +19,7 @@ class GameMaster:
         board: Board,
         players,
         max_turns=None,
-        n_turns_before_land_army_increments: int = 50,
+        normal_tile_increment_frequency: int = 50,
         logger: Logger = None,
     ):
         self.board = board
@@ -28,7 +28,7 @@ class GameMaster:
         self.players = players
         self.turn = 0
         self.max_turns = max_turns
-        self.n_turns_before_land_army_increments = n_turns_before_land_army_increments
+        self.normal_tile_increment_frequency = normal_tile_increment_frequency
 
         if self.logger is not None:
             # log initial board configuration
@@ -68,23 +68,19 @@ class GameMaster:
     def add_troops_to_board(self):
         """increment all troops on captured cities or generals"""
         # only increment troops on even turns
-        if self.turn % 2 == 1:
-            return
-
         for i in range(self.board.num_rows):
             for j in range(self.board.num_cols):
                 tile = self.board.grid[i][j]
 
                 # increment generals and captured cities every 2 turns
-                # increment player's land every 50 turns
-                if tile.type == TileType.GENERAL or (
+                if (tile.type == TileType.GENERAL and self.turn % 2 == 0) or (
                     tile.player_index is not None
                     and (
                         tile.type == TileType.CITY
+                        and self.turn % 2 == 0
                         or (
                             tile.type == TileType.NORMAL
-                            and self.turn % self.n_turns_before_land_army_increments
-                            == 0
+                            and self.turn % self.normal_tile_increment_frequency == 0
                         )
                     )
                 ):

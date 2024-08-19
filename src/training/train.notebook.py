@@ -45,14 +45,7 @@ from src.training.dqn.replay_memory import ReplayMemory, Transition
 from src.environment.logger import Logger
 from src.training.utils import convert_agent_dict_to_tensor
 from src.utils.scheduler import ExponentialHyperParameterSchedule
-
-# %%
-# set up matplotlib
-is_ipython = "inline" in matplotlib.get_backend()
-if is_ipython:
-    from IPython import display
-
-plt.ion()
+from src.utils.utils import delete_directory_contents
 
 # %%
 # if GPU is to be used
@@ -60,10 +53,10 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # %%
 BATCH_SIZE = 128  # replay buffer sample size
-GAMMA = 0.95
+GAMMA = 0.96
 EPS_START = 0.9
-EPS_END = 0.05
-EPS_DECAY = 1000  # higher means slower exponential decay
+EPS_END = 0.25
+EPS_DECAY = 100000  # higher means slower exponential decay
 TAU = 0.005  # update rate of target network
 LR = 1e-4
 
@@ -71,6 +64,7 @@ LR = 1e-4
 N_ROWS = 2
 N_COLUMNS = 2
 FOG_OF_WAR = False
+NORMAL_TILE_INCREMENT_FREQUENCY = 2
 INPUT_CHANNELS = get_input_channel_dimension_size(FOG_OF_WAR)
 N_HIDDEN_CONV_LAYERS = 0
 N_HIDDEN_CONV_CHANNELS = 32
@@ -105,19 +99,20 @@ env = GeneralsEnvironment(
         CuriousGeorgeAgent(
             policy_net=policy_net,
             epsilon_schedule=ExponentialHyperParameterSchedule(
-                initial_value=eps_start, final_value=eps_end, decay_rate=eps_decay
+                initial_value=EPS_START, final_value=EPS_END, decay_rate=EPS_DECAY
             ),
         ),
         CuriousGeorgeAgent(
             policy_net=policy_net,
             epsilon_schedule=ExponentialHyperParameterSchedule(
-                initial_value=eps_start, final_value=eps_end, decay_rate=eps_decay
+                initial_value=EPS_START, final_value=EPS_END, decay_rate=EPS_DECAY
             ),
         ),
     ],
     board_x_size=N_COLUMNS,
     board_y_size=N_ROWS,
     auxiliary_reward_weight=AUXILIARY_REWARD_WEIGHT,
+    normal_tile_increment_frequency=NORMAL_TILE_INCREMENT_FREQUENCY,
 )
 
 # %%
@@ -136,6 +131,7 @@ run = wandb.init(
         "n_hidden_conv_layers": N_HIDDEN_CONV_LAYERS,
         "n_hidden_conv_channels": N_HIDDEN_CONV_CHANNELS,
         "kernel_size": KERNEL_SIZE,
+        "normal_tile_increment_frequency": NORMAL_TILE_INCREMENT_FREQUENCY,
     },
 )
 
@@ -223,6 +219,10 @@ LOG_DIR.mkdir(exist_ok=True, parents=True)
 CHECKPOINT_DIR = Path("resources/checkpoints")
 LOG_DIR.mkdir(exist_ok=True, parents=True)
 
+# delete old logs and checkpoints
+delete_directory_contents(LOG_DIR)
+delete_directory_contents(CHECKPOINT_DIR)
+
 # %%
 num_episodes = 50000
 log_interval = 200
@@ -280,10 +280,12 @@ for i_episode in range(num_episodes):
                 step=global_step,
             )
 
+        # log other metrics
         legal_move_rate = list(info.values())[0]["is_game_action_legal"]
         wandb.log(
             {
                 "legal_move": int(legal_move_rate),
+                "epsilon": env.unwrapped.agents[0].epsilon,
             },
             step=global_step,
         )
