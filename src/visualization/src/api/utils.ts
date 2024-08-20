@@ -61,6 +61,7 @@ async function getData(path: string) {
  * @param path - a string representing the path to make the request to. The format should be 'router/endpoint'
  */
 const useData = (path: string) => {
+  console.log("path", path)
   const [data, setData] = useState<ResolvedReq | null>(null);
 
   useEffect(() => {

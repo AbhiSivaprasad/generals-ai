@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
-from flask import Flask, request
-from flask import make_response
+from pathlib import Path
+from flask import Flask, jsonify, request, make_response
 from flask_socketio import SocketIO, send, emit, join_room, leave_room
 
 
@@ -17,6 +17,7 @@ class UserState(Enum):
     IN_QUEUE = 3
 
 __dirname__ = os.path.dirname(__file__)
+ROOT_DIR = Path(__dirname__).parent
 
 app = Flask(__name__)
 socketio = SocketIO(app)
@@ -46,11 +47,23 @@ USERS = [
     }
 ]
 
-@app.route('/replay')
-def replay():
-    with open(os.path.join(__dirname__, '../resources/replays/{}.txt'.format("test_replay")), 'r') as file:
+
+@app.route("/replay/<path:replay_path>")
+def serve_replay(replay_path):
+    print("request for replay path:", replay_path)
+
+    # Construct the full path
+    replay_full_path = ROOT_DIR / "resources/replays" / f"{replay_path}.json"
+
+    # Check if the file exists and is within the allowed directory
+    if not replay_full_path.is_file() or not replay_full_path.is_relative_to(
+        ROOT_DIR / "resources/replays"
+    ):
+        return "Replay not found", 404
+
+    with open(replay_full_path, "r") as file:
         r = make_response(file.read())
-        r.headers['Access-Control-Allow-Origin'] = "*"
+        r.headers["Access-Control-Allow-Origin"] = "*"
         return r
 
 @socketio.on('connect')
@@ -81,10 +94,9 @@ def handle_move(data):
 
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True, port=8000)
 
 # TASKS
-# implement generals.io api
 # implement socket server to visualize games in real time
 # style visualization page

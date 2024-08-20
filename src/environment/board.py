@@ -26,14 +26,14 @@ class Board:
         check if game is over
         :return: if unfinished return -1 else return player index of victory
         """
-        if self.generals[1].type == 0:  # player 0 captured player 1's general
+        if self.generals[1].player_index == 0:  # player 0 captured player 1's general
             return 0
-        elif self.generals[0].type == 1:  # player 1 captured player 0's general
+        elif self.generals[0].player_index == 1:  # player 1 captured player 0's general
             return 1
         else:
             return -1
 
-    def is_valid_position(self, x, y):
+    def is_valid_position(self, x: int, y: int):
         return (
             0 <= y < self.num_rows
             and 0 <= x < self.num_cols
@@ -70,11 +70,16 @@ class Board:
         """
         Check if player's action is valid
 
+        0. waiting is a valid action
         1. start tile is within bounds and not a mountain
         2. destination tile is within bounds and not a mountain
         3. player owns start tile
         4. more than one troop on start tile
         """
+        # check if agent decides to wait
+        if action.do_nothing:
+            return True
+
         # check that start tile is within bounds and not a mountain
         if not self.is_valid_position(action.startx, action.starty):
             return False
@@ -164,6 +169,14 @@ class Board:
                 has_vision = True
 
         tile.player_visibilities[player_index] = has_vision
+
+    def get_player_score(self, player_index: int) -> int:
+        score = 0
+        for row in self.grid:
+            for tile in row:
+                if tile.player_index == player_index:
+                    score += tile.army
+        return score
 
     def _get_destination_tile(self, start_tile: Tile, action: Action):
         direction_vector = convert_direction_to_vector(action.direction)

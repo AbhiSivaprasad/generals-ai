@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from src.environment.action import Action
+import torch
 
 
 class Agent(ABC):
@@ -9,8 +9,15 @@ class Agent(ABC):
         self.player_index = player_index
 
     @abstractmethod
-    def move(self, state) -> Optional[Action]:
+    def move(self, state: torch.Tensor, env) -> int:
         """
-        An agent returns None if there are no legal moves or if the agent wishes to wait
+        An agent returns an integer index representing the action it wants to take
+        """
+        pass
+
+    @abstractmethod
+    def reset(self):
+        """
+        Reset the agent's state for a new game
         """
         pass

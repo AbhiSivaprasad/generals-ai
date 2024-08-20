@@ -1,6 +1,7 @@
 import random as rand
 
 import math
+from typing import List
 
 from src.environment.board import Board
 from src.environment.logger import Logger
@@ -13,7 +14,7 @@ class GameMaster:
     handles game state
     """
 
-    def __init__(self, board, players, max_turns=None, logger: Logger=None):
+    def __init__(self, board: Board, players, max_turns=None, logger: Logger = None):
         self.board = board
         self.board.player_index = None
         self.logger = logger
@@ -31,25 +32,30 @@ class GameMaster:
         :return: index of winning player or -1 if max turns reached
         """
         while self.board.terminal_status() == -1 and self.turn < self.max_turns:
-            # each player outputs a move given their view
-            for moving_player_index, player in list(enumerate(self.players)):
-                action = player.move(self.board)
-                if action is None:
-                    continue
-
-                # check for validity of action
-                if not self.board.is_action_valid(action, moving_player_index):
-                    continue
-
-                # update game board with player's action
-                self.update_game_state(action)
-
-            # game logic to add troops to generals, cities, and land on specific ticks
-            self.add_troops_to_board()
-
-            self.turn += 1
+            actions = [player.move(self.board) for player in self.players]
+            self.step(actions)
 
         return self.board.terminal_status()
+
+    def step(self, actions: List[Action]):
+        """
+        conduct one turn of the game
+        """
+        # each player outputs a move given their view
+        for moving_player_index, action in list(enumerate(actions)):
+            if action.do_nothing:
+                continue
+
+            # check for validity of action
+            if not self.board.is_action_valid(action, moving_player_index):
+                continue
+
+            # update game board with player's action
+            self.update_game_state(action)
+
+        # game logic to add troops to generals, cities, and land on specific ticks
+        self.add_troops_to_board()
+        self.turn += 1
 
     def add_troops_to_board(self):
         """increment all troops on captured cities or generals"""
@@ -63,12 +69,11 @@ class GameMaster:
 
                 # increment generals and captured cities every 2 turns
                 # increment player's land every 50 turns
-                if (
-                    tile.type == TileType.GENERAL
-                    or
-                    (tile.player_index is not None and
-                     (tile.type == TileType.CITY or
-                      (tile.type == TileType.NORMAL and self.turn % (25 * 2) == 0))
+                if tile.type == TileType.GENERAL or (
+                    tile.player_index is not None
+                    and (
+                        tile.type == TileType.CITY
+                        or (tile.type == TileType.NORMAL and self.turn % (25 * 2) == 0)
                     )
                 ):
                     tile.army += 1

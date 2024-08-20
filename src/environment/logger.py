@@ -20,7 +20,6 @@ class Logger:
         self.serialized_board = board.serialize()
 
     def log(self, tile: Tile, turn: int):
-        # if player index is null then update is for game board otherwise update player's view log
         if turn >= len(self.serialized_board_diffs):
             self.serialized_board_diffs.extend(
                 [[] for _ in range(turn - len(self.serialized_board_diffs) + 1)]

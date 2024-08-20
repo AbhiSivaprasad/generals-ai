@@ -1,11 +1,15 @@
 import random
 
+import torch
+
 from src.agents.agent import Agent
 from src.environment.action import Action, Direction
+from src.environment.environment import GeneralsEnvironment
 
 
 class RandomAgent(Agent):
-    def move(self, board):
+    def move(self, state: torch.Tensor, env: GeneralsEnvironment):
+        board = env.unwrapped.game_master.board
         valid_actions = []
         for i in range(board.num_rows):
             for j in range(board.num_cols):
@@ -15,6 +19,10 @@ class RandomAgent(Agent):
                         valid_actions.append(action)
 
         if len(valid_actions) > 0:
-            return random.choice(valid_actions)
+            action = random.choice(valid_actions)
+            return action.to_index()
         else:
-            return None
+            return Action(do_nothing=True)
+
+    def reset(self, seed=None):
+        pass
