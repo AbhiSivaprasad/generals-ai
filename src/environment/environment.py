@@ -103,16 +103,31 @@ class GeneralsEnvironment(ParallelEnv):
         terminations = self._get_terminations()
         truncations = self._get_truncations()
         infos = self._get_infos(game_actions)
-        
-        player_dict_to_list = lambda player_dict: [player_dict[agent_index] for agent_index in range(len(self.agents))]
-        
-        
-        self.game_master.logger.log_info("rewards", player_dict_to_list(rewards), self.n_step - 1)
-        self.game_master.logger.log_info("action_indices", player_dict_to_list(actions), self.n_step - 1)
-        self.game_master.logger.log_info("actions", [vars(a) for a in game_actions], self.n_step - 1)
-        self.game_master.logger.log_info("agent_infos", player_dict_to_list(infos), self.n_step - 1)
+
+        player_dict_to_list = lambda player_dict: [
+            player_dict[agent_index] for agent_index in range(len(self.agents))
+        ]
+
+        # log (s, a, r, s')
+        self.game_master.logger.log_info(
+            "rewards", player_dict_to_list(rewards), self.n_step - 1
+        )
+        self.game_master.logger.log_info(
+            "action_indices", player_dict_to_list(actions), self.n_step - 1
+        )
+        self.game_master.logger.log_info(
+            "actions", [vars(a) for a in game_actions], self.n_step - 1
+        )
+        self.game_master.logger.log_info(
+            "agent_infos", player_dict_to_list(infos), self.n_step - 1
+        )
+
         # when serializing observations, serialize them channels-last instead of channels-first i.e. (C, H, W) -> (H, W, C)
-        self.game_master.logger.log_info("next_obs_tensor", [a.transpose(1, 2, 0).tolist() for a in player_dict_to_list(observations)], self.n_step - 1)
+        self.game_master.logger.log_info(
+            "next_obs_tensor",
+            [a.transpose(1, 2, 0).tolist() for a in player_dict_to_list(observations)],
+            self.n_step - 1,
+        )
 
         return observations, rewards, terminations, truncations, infos
 
