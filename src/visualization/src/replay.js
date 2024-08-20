@@ -39,6 +39,7 @@ class Replay extends Component {
                 <table>
                 <tbody>
                 {
+                    this.props.infos.length > 0 &&
                     Object.entries(this.props.infos[this.state.time]).map(([k, v]) => {
                         return (
                             <tr key={k}>

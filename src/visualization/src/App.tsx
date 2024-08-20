@@ -75,7 +75,7 @@ function InnerApp() {
         <div>
             <button onClick={onViewButtonClick} value={0}>blue</button>
             <button onClick={onViewButtonClick} value={1}>red</button>
-            <Replay boardStates={boardStates} infos={infos} playerIndex={playerIndex} />
+            <Replay boardStates={boardStates} infos={infos || []} playerIndex={playerIndex} />
         </div>
     );
 }
