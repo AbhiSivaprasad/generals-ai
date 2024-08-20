@@ -37,11 +37,12 @@ from src.environment.environment import GeneralsEnvironment
 from src.environment.probes.probe0 import ProbeZeroEnvironment
 from src.agents.random_agent import RandomAgent
 from src.agents.curiousgeorge_agent import CuriousGeorgeAgent
-from src.training.dqn.dqn import DQN
+from src.training.models.dqn.dqn import DQN
+from src.training.models.fc_network import FCNetwork
 from src.training.input import (
     get_input_channel_dimension_size,
 )
-from src.training.dqn.replay_memory import ReplayMemory, Transition
+from src.training.models.dqn.replay_memory import ReplayMemory, Transition
 from src.environment.logger import Logger
 from src.training.utils import convert_agent_dict_to_tensor
 from src.utils.scheduler import ExponentialHyperParameterSchedule
@@ -55,7 +56,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 BATCH_SIZE = 128  # replay buffer sample size
 GAMMA = 0.96
 EPS_START = 0.9
-EPS_END = 0.25
+EPS_END = 0.30
 EPS_DECAY = 100000  # higher means slower exponential decay
 TAU = 0.005  # update rate of target network
 LR = 1e-4
@@ -66,34 +67,79 @@ N_COLUMNS = 2
 FOG_OF_WAR = False
 NORMAL_TILE_INCREMENT_FREQUENCY = 2
 INPUT_CHANNELS = get_input_channel_dimension_size(FOG_OF_WAR)
+
+# %%
+# DQN params
 N_HIDDEN_CONV_LAYERS = 0
 N_HIDDEN_CONV_CHANNELS = 32
 KERNEL_SIZE = 2
+
+# FC params
+N_HIDDEN_LAYERS = 3
+N_HIDDEN_DIMENSION = 128
 
 # %%
 N_ACTIONS = 4 * N_ROWS * N_COLUMNS + 1
 AUXILIARY_REWARD_WEIGHT = 0.1
 
+
 # %%
-policy_net = DQN(
-    N_ROWS,
-    N_COLUMNS,
-    KERNEL_SIZE,
-    INPUT_CHANNELS,
-    N_ACTIONS,
-    N_HIDDEN_CONV_LAYERS,
-    N_HIDDEN_CONV_CHANNELS,
-).to(device)
-target_net = DQN(
-    N_ROWS,
-    N_COLUMNS,
-    KERNEL_SIZE,
-    INPUT_CHANNELS,
-    N_ACTIONS,
-    N_HIDDEN_CONV_LAYERS,
-    N_HIDDEN_CONV_CHANNELS,
-).to(device)
+def get_dqn_network():
+    return DQN(
+        n_rows=N_ROWS,
+        n_columns=N_COLUMNS,
+        kernel_size=KERNEL_SIZE,
+        input_channels=INPUT_CHANNELS,
+        n_actions=N_ACTIONS,
+        n_hidden_conv_layers=N_HIDDEN_CONV_LAYERS,
+        n_hidden_conv_channels=N_HIDDEN_CONV_CHANNELS,
+    ).to(device)
+
+
+def get_fc_network():
+    return FCNetwork(
+        n_rows=N_ROWS,
+        n_columns=N_COLUMNS,
+        n_actions=N_ACTIONS,
+        n_input_channels=INPUT_CHANNELS,
+        n_hidden_dim=N_HIDDEN_DIMENSION,
+        n_hidden_layers=N_HIDDEN_LAYERS,
+    ).to(device)
+
+
+def get_network(type: str):
+    if type == "dqn":
+        return get_dqn_network()
+    elif type == "fc":
+        return get_fc_network()
+    else:
+        raise ValueError("Invalid network type")
+
+
+# %%
+def get_model_params(model_type):
+    if model_type == "dqn":
+        return {
+            "kernel_size": KERNEL_SIZE,
+            "n_hidden_conv_layers": N_HIDDEN_CONV_LAYERS,
+            "n_hidden_conv_channels": N_HIDDEN_CONV_CHANNELS,
+        }
+    elif model_type == "fc":
+        return {
+            "n_hidden_dim": N_HIDDEN_DIMENSION,
+            "n_hidden_layers": N_HIDDEN_LAYERS,
+        }
+    else:
+        raise ValueError("Invalid network type")
+
+
+# %%
+model_type = "fc"
+policy_net = get_network(model_type)
+target_net = get_network(model_type)
 target_net.load_state_dict(policy_net.state_dict())
+
+# %%
 env = GeneralsEnvironment(
     agents=[
         CuriousGeorgeAgent(
@@ -128,10 +174,8 @@ run = wandb.init(
         "eps_start": EPS_START,
         "eps_end": EPS_END,
         "eps_decay": EPS_DECAY,
-        "n_hidden_conv_layers": N_HIDDEN_CONV_LAYERS,
-        "n_hidden_conv_channels": N_HIDDEN_CONV_CHANNELS,
-        "kernel_size": KERNEL_SIZE,
         "normal_tile_increment_frequency": NORMAL_TILE_INCREMENT_FREQUENCY,
+        **get_model_params(model_type),
     },
 )
 
