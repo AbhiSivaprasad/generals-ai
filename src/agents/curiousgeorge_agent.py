@@ -26,7 +26,9 @@ class CuriousGeorgeAgent(Agent):
         if sample > self.epsilon:
             with torch.no_grad():
                 # argmax returns the indices of the maximum values along the specified dimension
-                return self.policy_net(state).argmax(dim=1).squeeze().item()
+                return (
+                    self.policy_net(state.unsqueeze(0)).argmax(dim=1).squeeze().item()
+                )
         else:
             return (
                 torch.tensor(

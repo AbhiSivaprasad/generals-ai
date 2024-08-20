@@ -10,8 +10,8 @@ class FCNetwork(nn.Module):
         n_columns: int,
         n_actions: int,
         n_input_channels: int,
-        n_hidden_dim: int = 1,
-        n_hidden_layers: int = 32,
+        n_hidden_dim: int = 128,
+        n_hidden_layers: int = 3,
     ):
         super(FCNetwork, self).__init__()
         # store model architecture
