@@ -57,10 +57,8 @@ class GeneralsEnvironment(gym.Env):
         self.mountain_probability, self.city_probability = mountain_probability, city_probability
         self.min_ratio_of_generals_distance_to_board_side = min_ratio_of_generals_distance_to_board_side
         
-        self.agent = GymAgent() if agent is None else GymAgent(agent=agent)
+        self.agent = GymAgent(player_index=0) if agent is None else GymAgent(agent=agent)
         self.opponent = opponent
-                
-        self.reset(seed=seed)
     
     def reset(self, seed: Optional[int] = None, options=None) -> Tuple[ObsType, Dict]:
         '''

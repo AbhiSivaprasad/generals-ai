@@ -18,11 +18,12 @@ class QGreedyAgent(Agent):
 
     def move(self, state: GameState) -> Optional[Action]:
         observation = state.to_observation(self.player_index)
+        # print("[INFO] QGreedyAgent.move() OBS: ", observation)
         q_values = self.q_function(observation)
         best_action, q_value = max(q_values, key=lambda x: x[1])
         r, c = state.board.num_rows, state.board.num_cols
         best_action = Action.from_space_sample(best_action, r, c)
-        # print("[INFO] QGreedyAgent.move() BEST_ACTION: ", best_action)
+        # print("[INFO] QGreedyAgent.move() BEST_ACTION: ", best_action, " Q_VAL: ", q_value)
         return best_action
     
     def reset(self, *args, **kwargs) -> None:
@@ -58,19 +59,20 @@ class DQNAgent(QGreedyAgent):
     ):
         self.model = model
         self.device = device
-        super().__init__(player_index, self.get_q_function(), *args, **kwargs)
+        super().__init__(player_index, self._get_q_function(), *args, **kwargs)
     
-    def get_q_function(self):
+    def _get_q_function(self):
         device = self.device if self.device is not None else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         model = self.model
         if model is None:
             return None
         def qf(observation: ObsType) -> List[Tuple[ActType, int]]:
             turn, obs = observation
-            rows, cols = obs.shape[0], obs.shape[1]
             obs = torch.tensor(obs, dtype=torch.float32).to(device=device).unsqueeze(0)
             with torch.no_grad():
-                q_values = model(obs).detach().cpu().numpy().flatten()
+                # print("[INFO] Observation:", obs)
+                q_values = model(obs).cpu().detach().numpy().flatten()
+                # print(q_values)
             return [(i, q_values[i]) for i in range(len(q_values))]
         return qf
     
@@ -79,7 +81,7 @@ class DQNAgent(QGreedyAgent):
         if device is not None:
             self.device = device
             self.model = self.model.to(device)
-        self.q_function = self.get_q_function()
+        self.q_function = self._get_q_function()
         
     
 

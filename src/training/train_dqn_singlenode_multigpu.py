@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 
@@ -32,8 +33,6 @@ from src.models.dqn_cnn import DQN
 from src.utils.replay_buffer import RayReplayBuffer, Experience
 from src.agents.utils.gym_agent import GymAgent
 from src.agents.utils.epsilon_random_agent import EpsilonRandomAgent
-
-
 import argparse
 
 
@@ -125,7 +124,7 @@ class EnvRunner:
     
     def _handle_observation(self, experience: Experience):
         self._local_buffer.append(experience)
-        if len(self._local_buffer) >= 500:
+        if len(self._local_buffer) >= 5000:
             self.buffer.add.remote(self._local_buffer)
             self._local_buffer = []
             gc.collect()
@@ -140,12 +139,13 @@ class EnvRunner:
             opponent = HumanExeAgent(1, **opponent)
         agent = ObservationReceiving(agent, observation_handler=self._handle_observation)
         self.env = gym.make("generals-v0", agent=agent, opponent=opponent, seed=config.seed, n_rows=config.n_rows, n_cols=config.n_cols)
-        self.agent: GymAgent = self.env.agent
-        self.agent.set_env(self.env)
+        self.env.agent.set_env(self.env) # because only here do we have access to the wrapped environment
         
     def _fetch_updates(self):
-        if isinstance(self.agent.unwrapped, DQNAgent):
-            dqn_agent: DQNAgent = self.agent.unwrapped
+        agent = self.env.agent
+        agent = agent.unwrapped if hasattr(agent, "unwrapped") else agent
+        if isinstance(agent, DQNAgent):
+            dqn_agent: DQNAgent = agent
             model = dqn_agent.model
             if dqn_agent.model is None:
                 model: torch.nn.Module = DQN(config.input_channels, config.num_actions, config.n_rows, config.n_cols).cuda().eval()
@@ -170,7 +170,7 @@ class EnvRunner:
             self.env.reset()
             print("[INFO] Running episode ", episodes + 1)
             batchsize = 25
-            self.agent.run_episodes(seed=agent_seed, n_runs=batchsize)
+            self.env.agent.run_episodes(seed=agent_seed, n_runs=batchsize)
             episodes += batchsize
 
 # Define training loop
@@ -262,7 +262,10 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
             print("[INFO] Updated target network.")
         
         if (train_step + 1) % (config.num_steps // 100) == 0:
-            print("[INFO] Running validation episodes...")
+            print("[INFO] Running validation episodes + checkpointing...")
+            torch.save(policy_net, f"resources/checkpoints/step_{train_step}.ckpt")
+            wandb.save("resources/checkpoints/*", base_path="resources/")
+            
             if isinstance(val_env_rand.agent.unwrapped, DQNAgent):
                 dqn_agent: DQNAgent = val_env_rand.agent.unwrapped
                 dqn_agent.update_model(policy_net, device=torch.device("cuda"))
@@ -293,13 +296,15 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
         run.finish()
 
 if __name__ == "__main__":
-    ray.init()
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_file", type=str, required=False, help="Path to a training config YAML file.")
+    parser.add_argument("--address", type=str, required=False, help="Ray cluster address.")
     args = parser.parse_args()
 
     config_file = args.config_file
+    address = args.address
+    
+    ray.init(address=address)
     
     config: DQNTrainingConfig = DQNTrainingConfig(config_file=config_file)
     
@@ -340,15 +345,15 @@ if __name__ == "__main__":
     # time.sleep(10)
     # env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 10)])
     # time.sleep(10)
-    env_runners.extend([EnvRunner.options(num_gpus=0.05).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.3, c.seed), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 20)])
+    env_runners.extend([EnvRunner.options(num_gpus=0.05).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.3, c.seed), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 5)])
     time.sleep(10)
-    env_runners.extend([EnvRunner.options(num_gpus=0.05).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.3, c.seed + 2**7 - 1), opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 30)])
+    env_runners.extend([EnvRunner.options(num_gpus=0.05).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.3, c.seed + 2**7 - 1), opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 5)])
     time.sleep(10)
     
-    run_tasks = [runner.run.remote() for runner in env_runners]
+    env_runners = [runner.run.remote() for runner in env_runners]
     
     # ray.wait(env_runners, num_returns=10)
-    # ray.get(run_tasks)
+    # ray.get(env_runners)
     
     # train_task = train.remote(config=config, server=server, buffer=buffer)
     # ray.wait([train_task], num_returns=1)

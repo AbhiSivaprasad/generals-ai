@@ -27,12 +27,13 @@ class GymAgent(AgentWrapper):
     
     gamma: float
     
-    def __init__(self, agent: Optional[Agent] = None, env: Optional[gym.Env] = None, gamma: float = 0.99, *args, **kwargs):
-        super().__init__(agent)
+    def __init__(self, agent: Optional[Agent] = None, env: Optional[gym.Env] = None, gamma: float = 0.99, player_index: Optional[int] = None, *args, **kwargs):
+        if agent is not None:
+            super().__init__(agent, *args, **kwargs)
+        elif player_index is not None:
+            self.player_index = player_index
         self.set_action(None)
         self.set_env(env)
-        if agent is not None:
-            self.set_agent(agent)
         self.gamma = gamma
         
     def set_action(self, action: Action):

@@ -1,3 +1,4 @@
+from typing import Optional
 from src.agents.agent import Agent
 from src.environment.action import Action
 from src.environment.gamestate import GameState
@@ -5,10 +6,9 @@ import traceback
 import sys
 
 class AgentWrapper(Agent):
-    agent: Agent = None
+    agent: Optional[Agent] = None # Optional because wrappers can have their own behavior too.
     
     def __init__(self, agent, *args, **kwargs):
-        super().__init__(agent.player_index, *args, **kwargs)
         self.agent = agent
 
     def __getattr__(self, name):
@@ -20,7 +20,8 @@ class AgentWrapper(Agent):
         return self.agent.move(state)
     
     def reset(self, *args, **kwargs) -> None:
-        self.agent.reset(*args, **kwargs)
+        if self.agent is not None:
+            self.agent.reset(*args, **kwargs)
     
     @property
     def unwrapped(self):

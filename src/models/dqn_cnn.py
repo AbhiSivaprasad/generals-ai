@@ -23,44 +23,59 @@ class DQN(nn.Module):
         block_dim=64,        
     ):
         super().__init__()
-        self.encoder = nn.Sequential(
-            nn.Conv2d(input_channels, encoder_dim, kernel_size=1, padding="same"), 
-            *[
-                nn.Sequential(
-                    nn.Conv2d(encoder_dim, encoder_dim, kernel_size=1, padding="same"), 
-                    nn.Conv2d(encoder_dim, encoder_dim, kernel_size=3, padding="same"), 
-                    LayerNorm(encoder_dim, eps=1e-6, data_format="channels_first"),
-                    nn.ReLU(),
-                    nn.Dropout2d(p=spatial_dropout)
-                )
-                for _ in range(encoder_depth)
-            ],
-            nn.Conv2d(encoder_dim, block_dim, kernel_size=3, padding="same"),
-            LayerNorm(encoder_dim, eps=1e-6, data_format="channels_first"),
-        )   
-        self.blocks = nn.Sequential(
-            ConvNeXtBlock(block_dim),
-            nn.Conv2d(block_dim, block_dim // 2, kernel_size=3, padding=1, stride=2),
-            nn.Dropout2d(p=spatial_dropout),
-            ConvNeXtBlock(block_dim // 2),
+        # self.encoder = nn.Sequential(
+        #     nn.Conv2d(input_channels, encoder_dim, kernel_size=1, padding="same"), 
+        #     *[
+        #         nn.Sequential(
+        #             nn.Conv2d(encoder_dim, encoder_dim, kernel_size=1, padding="same"), 
+        #             nn.Conv2d(encoder_dim, encoder_dim, kernel_size=3, padding="same"), 
+        #             LayerNorm(encoder_dim, eps=1e-6, data_format="channels_first"),
+        #             nn.ReLU(),
+        #             nn.Dropout2d(p=spatial_dropout)
+        #         )
+        #         for _ in range(encoder_depth)
+        #     ],
+        #     nn.Conv2d(encoder_dim, block_dim, kernel_size=3, padding="same"),
+        #     LayerNorm(encoder_dim, eps=1e-6, data_format="channels_first"),
+        # )   
+        # self.blocks = nn.Sequential(
+        #     ConvNeXtBlock(block_dim),
+        #     nn.Conv2d(block_dim, block_dim // 2, kernel_size=3, padding=1, stride=2),
+        #     nn.Dropout2d(p=spatial_dropout),
+        #     ConvNeXtBlock(block_dim // 2),
+        #     nn.ReLU(),
+        #     nn.Conv2d(block_dim // 2, block_dim // 4, kernel_size=3, padding=1),
+        #     LayerNorm(block_dim // 4, eps=1e-6, data_format="channels_first"),
+        # )
+        # half_ceil = lambda x: (x + 1) // 2
+        # fc_dim = half_ceil(n_rows) * half_ceil(n_cols) * (block_dim // 4)
+        # self.fc_layers = nn.Sequential(
+        #     nn.Flatten(),
+        #     nn.Linear(fc_dim, fc_dim),
+        #     nn.Linear(fc_dim, fc_dim),
+        #     nn.PReLU(),
+        #     nn.Linear(fc_dim, fc_dim),
+        #     nn.Linear(fc_dim, num_actions)
+        # )
+        
+        simple_dim = 16
+        self.simple_net = nn.Sequential(
+            nn.Conv2d(input_channels, simple_dim, 1, padding="same"),
+            nn.Conv2d(simple_dim, simple_dim, 3, padding=1),
             nn.ReLU(),
-            nn.Conv2d(block_dim // 2, block_dim // 4, kernel_size=3, padding=1),
-            LayerNorm(block_dim // 4, eps=1e-6, data_format="channels_first"),
-        )
-        half_ceil = lambda x: (x + 1) // 2
-        fc_dim = half_ceil(n_rows) * half_ceil(n_cols) * (block_dim // 4)
-        self.fc_layers = nn.Sequential(
+            nn.Conv2d(simple_dim, simple_dim, 3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(simple_dim, simple_dim, 3, padding=1),
+            nn.AvgPool2d(3, 3),
             nn.Flatten(),
-            nn.Linear(fc_dim, fc_dim),
-            nn.Linear(fc_dim, fc_dim),
-            nn.PReLU(),
-            nn.Linear(fc_dim, fc_dim),
-            nn.Linear(fc_dim, num_actions)
+            nn.Linear(simple_dim * (n_rows // 3) * (n_cols // 3), num_actions),
+            nn.Linear(num_actions, num_actions),
         )
 
     def forward(self, x):
         x = x.permute(0, 3, 1, 2)
-        x = self.encoder(x)
-        x = self.blocks(x)
-        x = self.fc_layers(x)
+        # x = self.encoder(x)
+        # x = self.blocks(x)
+        # x = self.fc_layers(x)
+        x = self.simple_net(x)
         return x
