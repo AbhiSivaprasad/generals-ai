@@ -149,8 +149,8 @@ class EnvRunner:
             model = dqn_agent.model
             if dqn_agent.model is None:
                 model: torch.nn.Module = DQN(config.input_channels, config.num_actions, config.n_rows, config.n_cols).cuda().eval()
-                dqn_agent.update_model(model, device=torch.device("cuda"))
             model.load_state_dict(ray.get(self.server.get_target_net.remote()))
+            dqn_agent.update_model(model, device=torch.device("cuda"))
             gc.collect()
             torch.cuda.empty_cache() 
     
@@ -180,10 +180,14 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
     target_net: torch.nn.Module = DQN(config.input_channels, config.num_actions, config.n_rows, config.n_cols).cuda().eval()
     target_net.load_state_dict(ray.get(server.get_target_net.remote()))
     
-    policy_net = DQN(config.input_channels, config.num_actions, config.n_rows, config.n_cols).cuda().train()
+    policy_net = DQN(config.input_channels, config.num_actions, config.n_rows, config.n_cols)
     policy_net.load_state_dict(target_net.state_dict())
+    policy_net.cuda().train()
+    for p in policy_net.parameters():
+        p.requires_grad_(True)
     
-    optimizer = optim.SGD(policy_net.parameters(), lr=config.learning_rate)
+    print("[INFO] # params: ", len(list(policy_net.parameters())))
+    optimizer = optim.AdamW(policy_net.parameters(), lr=config.learning_rate)
     
     val_env_rand: GeneralsEnvironment = gym.make("generals-v0", agent=DQNAgent(0, policy_net.cuda(), None), opponent=RandomAgent(1, config.seed + (config.seed % 13) + 2 ** (config.seed % 19)), seed=config.seed, n_rows=config.n_rows, n_cols=config.n_cols)
     val_env_humanexe: GeneralsEnvironment = gym.make("generals-v0", agent=DQNAgent(0, policy_net.cuda(), None), opponent=HumanExeAgent(1), seed=config.seed, n_rows=config.n_rows, n_cols=config.n_cols)
@@ -226,24 +230,28 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
             target_q_value: torch.Tensor = target_net(s_t_1)[:config.batch_size, max_action]
             
         
-        s_t = torch.tensor(s_t, dtype=torch.float32).cuda()
+        s_t = torch.tensor(s_t, dtype=torch.float32).cuda().requires_grad_(True)
         a_t = [int(a) for a in a_t]
-        r_t_1 = torch.tensor(r_t_1, dtype=torch.float32).cuda()
-        d_t_1 = torch.tensor(d_t_1, dtype=torch.float32).cuda()
-        target_q_value = target_q_value.cuda()
+        r_t_1 = torch.tensor(r_t_1, dtype=torch.float32).cuda().requires_grad_(False)
+        d_t_1 = torch.tensor(d_t_1, dtype=torch.float32).cuda().requires_grad_(False)
+        target_q_value = target_q_value.cuda().requires_grad_(False)
         
         predicted_q_vals: torch.Tensor = policy_net(s_t)[:config.batch_size, a_t]
 
-        loss = F.huber_loss(predicted_q_vals, r_t_1 + config.gamma * target_q_value * (1 - d_t_1))
-        losses.append(loss.item())
-        loss.backward()
+        tde = (r_t_1 + config.gamma * target_q_value * (1 - d_t_1)) - predicted_q_vals
+        loss = tde.pow(2).mean()
         
-        optimizer.step()
         optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        
+        losses.append(loss.item())
         
         if config.use_wandb:
-            grad_norm = torch.norm(nn.utils.parameters_to_vector(policy_net.parameters()), 2.0)
-            grad_max = torch.max(nn.utils.parameters_to_vector(policy_net.parameters()))
+            grad_params = [p for p in policy_net.parameters() if p.grad is not None and p.requires_grad]
+            print("[INFO] # grad params: ", len(grad_params))
+            grad_norm = torch.norm(torch.stack([a.grad.detach().data.norm(2) for a in grad_params]), 2.0)
+            grad_max = torch.max(torch.stack([a.grad.detach().data.norm(2) for a in grad_params]))
             wandb.log({
                 "loss": loss.item(),
                 "q_values_max": predicted_q_vals.max().item(),
@@ -268,10 +276,10 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
             
             if isinstance(val_env_rand.agent.unwrapped, DQNAgent):
                 dqn_agent: DQNAgent = val_env_rand.agent.unwrapped
-                dqn_agent.update_model(policy_net, device=torch.device("cuda"))
+                dqn_agent.update_model(target_net, device=torch.device("cuda"))
             if isinstance(val_env_humanexe.agent.unwrapped, DQNAgent):
                 dqn_agent: DQNAgent = val_env_humanexe.agent.unwrapped
-                dqn_agent.update_model(policy_net, device=torch.device("cuda"))
+                dqn_agent.update_model(target_net, device=torch.device("cuda"))
 
             gc.collect()
             torch.cuda.empty_cache() 
@@ -345,9 +353,9 @@ if __name__ == "__main__":
     # time.sleep(10)
     # env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 10)])
     # time.sleep(10)
-    env_runners.extend([EnvRunner.options(num_gpus=0.05).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.3, c.seed), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 5)])
+    env_runners.extend([EnvRunner.options(num_gpus=0.05).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.8, c.seed), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 10)])
     time.sleep(10)
-    env_runners.extend([EnvRunner.options(num_gpus=0.05).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.3, c.seed + 2**7 - 1), opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 5)])
+    env_runners.extend([EnvRunner.options(num_gpus=0.05).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.8, c.seed + 2**7 - 1), opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 10)])
     time.sleep(10)
     
     env_runners = [runner.run.remote() for runner in env_runners]

@@ -11,6 +11,7 @@ from gymnasium.spaces import Space, \
     
 from src.agents.utils.gym_agent import GymAgent
 from src.environment import MAX_SIZE, board_generator, game_master
+from src.environment.gamestate import GameState
 from src.agents.agent import Agent
 from src.environment.action import Action
 from src.environment.logger import Logger
@@ -92,7 +93,7 @@ class GeneralsEnvironment(gym.Env):
         The behaviour of this function depends primarily on the dynamics of the underlying
         environment.
         '''
-        self._prev_state = deepcopy(self.game.state)
+        self._prev_state = GameState(self.game.state.board, deepcopy(self.game.state.scores), self.game.state.turn, self.game.state.terminal_status)
         
         action_idx = action
         action = Action.from_space_sample(action_idx, self.num_rows, self.num_cols)

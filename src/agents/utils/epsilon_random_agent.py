@@ -27,5 +27,4 @@ class EpsilonRandomAgent(AgentWrapper):
         return move
 
     def reset(self, *args, seed = None, **kwargs) -> None:
-        super().reset(seed=seed)
         self.rng = np.random.default_rng(seed)
