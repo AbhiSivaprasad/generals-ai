@@ -44,15 +44,7 @@ class Replay extends Component {
                         return (
                             <tr key={k}>
                                 <td>{k}</td>
-                                {
-                                    v.map(cell => {    
-                                        return (
-                                            <td>
-                                                {JSON.stringify(cell)}
-                                            </td>
-                                        )
-                                    })
-                                }
+                                <td>{JSON.stringify(v)}</td>
                             </tr>
                         )
                     })

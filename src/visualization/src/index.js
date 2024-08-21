@@ -1,5 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+
 import App from './App';
 
 import * as serviceWorker from './serviceWorker';
@@ -8,7 +10,11 @@ import reportWebVitals from './reportWebVitals';
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <App />
+    <Router>
+        <Routes>
+            <Route path="/replay/*" element={<App />} />
+        </Routes>
+    </Router>
   </React.StrictMode>
 );
 
