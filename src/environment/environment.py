@@ -111,11 +111,11 @@ class GeneralsEnvironment(gym.Env):
             
         info = {"opponent": self.opponent, "legal_move": legal_move, "game_state": self.game.state, "prev_state": self._prev_state}
         
-        self.game.logger.log_info("obs", self._prev_state.to_observation(self.agent.player_index), self._prev_state.turn)
-        self.game.logger.log_info("reward", reward, self._prev_state.turn)
-        self.game.logger.log_info("action_idx", action_idx, self._prev_state.turn)
+        self.game.logger.log_info("obs", self._prev_state.to_observation(self.agent.player_index)[1].tolist(), self._prev_state.turn)
+        self.game.logger.log_info("reward", float(reward), self._prev_state.turn)
+        self.game.logger.log_info("action_idx", int(action_idx), self._prev_state.turn)
         self.game.logger.log_info("action", str(action), self._prev_state.turn)
-        self.game.logger.log_info("info", info, self._prev_state.turn)
+        self.game.logger.log_info("info", {k: str(v) for (k, v) in info.items()}, self._prev_state.turn)
         
         return (new_obs, reward, terminated, False, info)
     
