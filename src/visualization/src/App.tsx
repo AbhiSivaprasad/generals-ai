@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 // custom font
 import "typeface-quicksand"
 import { useData } from './api/utils';
+import { useParams, useMatch } from 'react-router-dom';
 import Replay from './replay';
 import { CellState, BoardState } from './types/globals';
 
@@ -25,8 +26,9 @@ function App() {
     const [boardStates, setBoardStates] = useState<any[]>([]);
     const [infos, setInfos] = useState<any[]>([]);
 
-
-    const replayData = useData("/replay");
+    const match = useMatch('/replay/*');
+    const replayPath = match?.pathname.split('/replay/')[1] || '';
+    const replayData = useData(`/replay/${replayPath}`);
 
     useEffect(() => {
         if(!replayData) return;
