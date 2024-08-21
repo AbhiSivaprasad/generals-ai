@@ -27,7 +27,7 @@ if __name__ == "__main__":
     env: GeneralsEnvironment = gym.make("generals-v0", opponent=RandomAgent(1, 31), seed=int(seeder.integers(0, 2**29)), n_rows=15, n_cols=15)
     env.agent.set_env(env)
     
-    for _ in range(100):
+    for _ in range(10):
         env.reset(seed=int(seeder.integers(0, 2**29)))
         
         generals = env.game.state.board.generals

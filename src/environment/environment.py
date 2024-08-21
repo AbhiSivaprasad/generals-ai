@@ -60,6 +60,8 @@ class GeneralsEnvironment(gym.Env):
         
         self.agent = GymAgent(player_index=0) if agent is None else GymAgent(agent=agent)
         self.opponent = opponent
+        
+        self.reset(seed=seed)
     
     def reset(self, seed: Optional[int] = None, options=None) -> Tuple[ObsType, Dict]:
         '''

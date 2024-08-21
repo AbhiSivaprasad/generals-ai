@@ -222,19 +222,19 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
         with torch.inference_mode():
             s_t_1 = torch.tensor(s_t_1, dtype=torch.float32).cuda()
             # double DQN
-            target_net_max_action = torch.argmax(target_net(s_t_1), dim=-1)
-            policy_net_target_q_value: torch.Tensor = policy_net(s_t_1)[:config.batch_size, target_net_max_action]
+            max_action = torch.argmax(policy_net(s_t_1), dim=-1)
+            target_q_value: torch.Tensor = target_net(s_t_1)[:config.batch_size, max_action]
             
         
         s_t = torch.tensor(s_t, dtype=torch.float32).cuda()
         a_t = [int(a) for a in a_t]
         r_t_1 = torch.tensor(r_t_1, dtype=torch.float32).cuda()
         d_t_1 = torch.tensor(d_t_1, dtype=torch.float32).cuda()
-        policy_net_target_q_value = policy_net_target_q_value.cuda()
+        target_q_value = target_q_value.cuda()
         
         predicted_q_vals: torch.Tensor = policy_net(s_t)[:config.batch_size, a_t]
 
-        loss = F.huber_loss(predicted_q_vals, r_t_1 + config.gamma * policy_net_target_q_value * (1 - d_t_1))
+        loss = F.huber_loss(predicted_q_vals, r_t_1 + config.gamma * target_q_value * (1 - d_t_1))
         losses.append(loss.item())
         loss.backward()
         
@@ -276,8 +276,8 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
             gc.collect()
             torch.cuda.empty_cache() 
             
-            val_env_rand.reset()
-            val_env_humanexe.reset()
+            val_env_rand.reset(seed=config.seed * 2)
+            val_env_humanexe.reset(seed=config.seed * 2)
             reward_rand = float(val_env_rand.agent.run_episode(config.seed))
             reward_humanexe = float(val_env_humanexe.agent.run_episode(config.seed))
             print("[INFO] Validation rewards: ", reward_rand, "--", reward_humanexe)

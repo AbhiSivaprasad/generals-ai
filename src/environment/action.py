@@ -38,18 +38,18 @@ class Action:
 
 def convert_direction_to_vector(direction: Direction) -> Tuple[int, int]:
     if direction == Direction.UP:
-        return 0, 1
-    elif direction == Direction.DOWN:
         return 0, -1
+    elif direction == Direction.DOWN:
+        return 0, 1
     elif direction == Direction.LEFT:
         return -1, 0
     elif direction == Direction.RIGHT:
         return 1, 0
 
 def convert_vector_to_direction(vector: Tuple[int, int]) -> Direction:
-    if vector == (0, 1):
+    if vector == (0, -1):
         return Direction.UP
-    elif vector == (0, -1):
+    elif vector == (0, 1):
         return Direction.DOWN
     elif vector == (-1, 0):
         return Direction.LEFT

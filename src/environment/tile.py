@@ -46,7 +46,7 @@ class Tile(object):
         self._board = board
 
     def __repr__(self):
-        return "(%d,%d) %s (%d)" % (self.x, self.y, str(self.type), self.army)
+        return "%s[%02d]" % (str(self.type.value)[0], self.army)
 
     def serialize(self):
         return {
