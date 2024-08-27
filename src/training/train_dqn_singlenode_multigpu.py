@@ -247,9 +247,10 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
         
         losses.append(loss.item())
         
+        print("Action distribution: ", np.histogram(np.array(a_t), bins=range(config.num_actions))[0])
+        
         if config.use_wandb:
             grad_params = [p for p in policy_net.parameters() if p.grad is not None and p.requires_grad]
-            print("[INFO] # grad params: ", len(grad_params))
             grad_norm = torch.norm(torch.stack([a.grad.detach().data.norm(2) for a in grad_params]), 2.0)
             grad_max = torch.max(torch.stack([a.grad.detach().data.norm(2) for a in grad_params]))
             wandb.log({
@@ -277,6 +278,7 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
             if isinstance(val_env_rand.agent.unwrapped, DQNAgent):
                 dqn_agent: DQNAgent = val_env_rand.agent.unwrapped
                 dqn_agent.update_model(target_net, device=torch.device("cuda"))
+                
             if isinstance(val_env_humanexe.agent.unwrapped, DQNAgent):
                 dqn_agent: DQNAgent = val_env_humanexe.agent.unwrapped
                 dqn_agent.update_model(target_net, device=torch.device("cuda"))
@@ -286,8 +288,8 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
             
             val_env_rand.reset(seed=config.seed * 2)
             val_env_humanexe.reset(seed=config.seed * 2)
-            reward_rand = float(val_env_rand.agent.run_episode(config.seed))
-            reward_humanexe = float(val_env_humanexe.agent.run_episode(config.seed))
+            reward_rand = 0.1 * sum(val_env_rand.agent.run_episodes(config.seed, 10))
+            reward_humanexe = 0.1 * sum(val_env_humanexe.agent.run_episodes(config.seed, 10))
             print("[INFO] Validation rewards: ", reward_rand, "--", reward_humanexe)
             
             val_env_rand.write("val_rand_episode_" + str(train_step) + ".txt")
@@ -297,7 +299,7 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
                 wandb.log({
                     "val_rewards_rand": reward_rand,
                     "val_rewards_humanexe": reward_humanexe
-                }, step=train_step)
+                    }, step=train_step)
             
     
     if config.use_wandb:
@@ -346,16 +348,16 @@ if __name__ == "__main__":
     
     configs = [copy.deepcopy(config) for _ in range(1000)]
     for i, c in enumerate(configs):
-        c.seed = 2**(i % 29) + 2 * i + 1
+        c.seed = 2**((2*i+3) % 27) - 13 * i + 1 + (i+11)**2
     
     env_runners = []
     # env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 20)])
     # time.sleep(10)
     # env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 10)])
     # time.sleep(10)
-    env_runners.extend([EnvRunner.options(num_gpus=0.05).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.8, c.seed), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 10)])
+    env_runners.extend([EnvRunner.options(num_gpus=0.01).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.8, c.seed), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 25)])
     time.sleep(10)
-    env_runners.extend([EnvRunner.options(num_gpus=0.05).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.8, c.seed + 2**7 - 1), opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 10)])
+    env_runners.extend([EnvRunner.options(num_gpus=0.01).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.8, c.seed + 2**7 - 1), opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 25)])
     time.sleep(10)
     
     env_runners = [runner.run.remote() for runner in env_runners]
