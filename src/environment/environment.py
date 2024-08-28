@@ -91,14 +91,17 @@ class GeneralsEnvironment(ParallelEnv):
         player_dict_to_list = lambda player_dict: [
             player_dict[agent_index] for agent_index in range(len(self.agents))
         ]
-        
+
         # when serializing observations, serialize them channels-last instead of channels-first i.e. (C, H, W) -> (H, W, C)
         self.game_master.logger.log_info(
-            "obs_tensor", 
-            [a.transpose(1, 2, 0).tolist() for a in player_dict_to_list(self._get_observations())], 
-            self.n_step
+            "obs_tensor",
+            [
+                a.transpose(1, 2, 0).tolist()
+                for a in player_dict_to_list(self._get_observations())
+            ],
+            self.n_step,
         )
-        
+
         # Convert actions to the format expected by game_master
         game_actions = [
             Action.from_index(actions[agent_index], self.board_x_size)
@@ -114,11 +117,19 @@ class GeneralsEnvironment(ParallelEnv):
         terminations = self._get_terminations()
         truncations = self._get_truncations()
         infos = self._get_infos(game_actions)
-        
-        self.game_master.logger.log_info("rewards", player_dict_to_list(rewards), self.n_step - 1)
-        self.game_master.logger.log_info("action_indices", player_dict_to_list(actions), self.n_step - 1)
-        self.game_master.logger.log_info("actions", [vars(a) for a in game_actions], self.n_step - 1)
-        self.game_master.logger.log_info("agent_infos", player_dict_to_list(infos), self.n_step - 1)
+
+        self.game_master.logger.log_info(
+            "rewards", player_dict_to_list(rewards), self.n_step - 1
+        )
+        self.game_master.logger.log_info(
+            "action_indices", player_dict_to_list(actions), self.n_step - 1
+        )
+        self.game_master.logger.log_info(
+            "actions", [vars(a) for a in game_actions], self.n_step - 1
+        )
+        self.game_master.logger.log_info(
+            "agent_infos", player_dict_to_list(infos), self.n_step - 1
+        )
 
         return observations, rewards, terminations, truncations, infos
 
@@ -133,10 +144,48 @@ class GeneralsEnvironment(ParallelEnv):
             for agent_index in range(len(self.agents))
         }
 
-    def _get_rewards(self):
-        # reward component 1: change in difference between agent's score and other agent's score
+    def _get_rewards(self, game_actions: List[Action] = None):
+        # reward component 1a: change in difference between agent's score and other agent's score
+        # reward component 1b: whether action was legal
         # reward component 2: win/loss
-        # final reward is component 2 + 0.01 * component 1
+        # final reward is component 2 + constant * component 1
+        auxiliary_land_rewards = self.get_auxiliary_land_reward()
+        auxiliary_legal_move_rewards = self.get_auxiliary_legal_move_reward(
+            game_actions
+        )
+        main_rewards = self.get_main_rewards()
+        total_rewards = {
+            agent_index: main_rewards[agent_index]
+            + self.auxiliary_reward_weight
+            * (
+                auxiliary_land_rewards[agent_index]
+                + auxiliary_legal_move_rewards[agent_index]
+            )
+            for agent_index in range(len(self.agents))
+        }
+        return total_rewards
+
+    def get_main_rewards(self):
+        winning_agent_index = self.game_master.board.terminal_status()
+        main_rewards = {}
+        for agent_index in range(len(self.agents)):
+            if winning_agent_index == -1:
+                main_rewards[agent_index] = 0
+            else:
+                main_rewards[agent_index] = (
+                    1 if agent_index == winning_agent_index else -1
+                )
+        return main_rewards
+
+    def get_auxiliary_legal_move_reward(self, game_actions: List[Action]):
+        return {
+            i: int(
+                self.game_master.board.is_action_valid(action=action, player_index=i)
+            )
+            for i, action in enumerate(game_actions)
+        }
+
+    def get_auxiliary_land_reward(self):
         agent_scores = {
             agent_index: self.game_master.board.get_player_score(agent_index)
             for agent_index in range(len(self.agents))
@@ -151,27 +200,8 @@ class GeneralsEnvironment(ParallelEnv):
             agent_index: 2 * agent_score_change - total_agent_score_changes
             for agent_index, agent_score_change in agent_score_changes.items()
         }
-
-        main_rewards = self.get_main_rewards()
-        total_rewards = {
-            agent_index: main_rewards[agent_index]
-            + self.auxiliary_reward_weight * auxiliary_rewards[agent_index]
-            for agent_index in range(len(self.agents))
-        }
         self.previous_agent_scores = agent_scores
-        return total_rewards
-
-    def get_main_rewards(self):
-        winning_agent_index = self.game_master.board.terminal_status()
-        main_rewards = {}
-        for agent_index in range(len(self.agents)):
-            if winning_agent_index == -1:
-                main_rewards[agent_index] = 0
-            else:
-                main_rewards[agent_index] = (
-                    1 if agent_index == winning_agent_index else -1
-                )
-        return main_rewards
+        return auxiliary_rewards
 
     def _get_terminations(self):
         game_over = self.game_master.board.terminal_status() != -1
