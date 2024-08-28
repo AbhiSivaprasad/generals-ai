@@ -40,7 +40,7 @@ class GameMaster:
         :return: index of winning player or -1 if max turns reached
         """
         while self.board.terminal_status() == -1 and self.turn < self.max_turns:
-            actions = [player.move(self.board) for player in self.players]
+            actions = [player.move(self.board)[0] for player in self.players]
             self.step(actions)
 
         return self.board.terminal_status()

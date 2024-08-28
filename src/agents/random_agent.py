@@ -20,9 +20,11 @@ class RandomAgent(Agent):
 
         if len(valid_actions) > 0:
             action = random.choice(valid_actions)
-            return action.to_index(env.unwrapped.board_x_size)
+            action = action.to_index(env.unwrapped.board_x_size), info
         else:
-            return Action(do_nothing=True).to_index(env.unwrapped.board_x_size)
+            action = Action(do_nothing=True).to_index(env.unwrapped.board_x_size), info
+        info = {"best_action": random.choice(valid_actions)}
+        return action, info
 
     def reset(self, seed=None):
         pass

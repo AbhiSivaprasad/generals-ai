@@ -113,10 +113,10 @@ class GeneralsEnvironment(ParallelEnv):
         self.n_step += 1
 
         observations = self._get_observations()
-        rewards = self._get_rewards()
+        rewards = self._get_rewards(game_actions)
         terminations = self._get_terminations()
         truncations = self._get_truncations()
-        infos = self._get_infos(game_actions)
+        infos = self._get_infos()
 
         self.game_master.logger.log_info(
             "rewards", player_dict_to_list(rewards), self.n_step - 1
@@ -211,22 +211,8 @@ class GeneralsEnvironment(ParallelEnv):
         truncated = self.n_step >= self.max_turns
         return {agent_index: truncated for agent_index in range(len(self.agents))}
 
-    def _get_infos(self, game_actions):
-        are_game_actions_legal = {
-            agent_index: self.game_master.board.is_action_valid(
-                game_actions[agent_index], agent_index
-            )
-            for agent_index in range(len(self.agents))
-        }
-        infos = self._merge_info_dicts(is_game_action_legal=are_game_actions_legal)
-        return infos
-
-    def _merge_info_dicts(self, **info_dicts):
-        infos = defaultdict(dict)
-        for info_type, info_dict in info_dicts.items():
-            for agent_index, info in info_dict.items():
-                infos[agent_index][info_type] = info
-        return infos
+    def _get_infos(self):
+        return {agent_index: {} for agent_index in range(len(self.agents))}
 
     def render(self):
         pass

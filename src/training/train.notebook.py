@@ -47,6 +47,7 @@ from src.environment.logger import Logger
 from src.training.utils import convert_agent_dict_to_tensor
 from src.utils.scheduler import ExponentialHyperParameterSchedule
 from src.utils.utils import delete_directory_contents
+from src.environment.action import Action
 
 # %%
 # if GPU is to be used
@@ -279,9 +280,13 @@ for i_episode in range(num_episodes):
     convert_agent_dict_to_tensor(state, device=device)
     num_agents = len(env.unwrapped.agents)
     for t in count():
-        actions = {
+        actions_with_info = {
             agent_index: agent.move(state[agent_index], env)
             for agent_index, agent in enumerate(env.unwrapped.agents)
+        }
+        actions = {
+            agent_index: action
+            for agent_index, (action, _) in actions_with_info.items()
         }
         observation, rewards, terminated, truncated, info = env.step(actions)
         convert_agent_dict_to_tensor(rewards, device=device)
@@ -324,11 +329,19 @@ for i_episode in range(num_episodes):
                 step=global_step,
             )
 
+        # get legal move rate of agent 0
+        _, action_info = actions_with_info[0]
+        is_action_legal = env.unwrapped.game_master.board.is_action_valid(
+            Action.from_index(
+                action_info["best_action"], n_columns=env.unwrapped.board_x_size
+            ),
+            player_index=0,
+        )
+
         # log other metrics
-        legal_move_rate = list(info.values())[0]["is_game_action_legal"]
         wandb.log(
             {
-                "legal_move": int(legal_move_rate),
+                "legal_move": int(is_action_legal),
                 "epsilon": env.unwrapped.agents[0].epsilon,
             },
             step=global_step,
