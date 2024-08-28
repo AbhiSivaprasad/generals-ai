@@ -57,7 +57,7 @@ BATCH_SIZE = 128  # replay buffer sample size
 GAMMA = 0.96
 EPS_START = 0.9
 EPS_END = 0.30
-EPS_DECAY = 100000  # higher means slower exponential decay
+EPS_DECAY = 600000  # higher means slower exponential decay
 TAU = 0.005  # update rate of target network
 LR = 1e-4
 
