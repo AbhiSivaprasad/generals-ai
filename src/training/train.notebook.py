@@ -57,7 +57,8 @@ from src.environment.probes.probe3 import ProbeThreeEnvironment
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # %%
-BATCH_SIZE = 128  # replay buffer sample size
+REPLAY_MEMORY_SIZE = 50000
+BATCH_SIZE = 1024  # replay buffer sample size
 GAMMA = 0
 EPS_START = 0.9
 EPS_END = 0.01
@@ -180,6 +181,7 @@ run = wandb.init(
         "eps_end": EPS_END,
         "eps_decay": EPS_DECAY,
         "normal_tile_increment_frequency": NORMAL_TILE_INCREMENT_FREQUENCY,
+        "replay_memory_size", REPLAY_MEMORY_SIZE,
         **get_model_params(model_type),
     },
 )
@@ -191,7 +193,7 @@ n_observations = len(state)
 
 # %%
 optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
-memory = ReplayMemory(10000)
+memory = ReplayMemory(REPLAY_MEMORY_SIZE)
 
 # %%
 steps_done = 0
@@ -274,8 +276,8 @@ delete_directory_contents(CHECKPOINT_DIR)
 
 # %%
 num_episodes = 50000
-log_interval = 200
-checkpoint_interval = 200
+log_interval = 50
+checkpoint_interval = 500
 global_step = 0
 for i_episode in range(num_episodes):
     logger = Logger()
