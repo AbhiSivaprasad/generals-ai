@@ -5,9 +5,9 @@ from typing import Optional, Tuple
 
 class Direction(int, Enum):
     UP = 0
-    DOWN = 1
-    LEFT = 2
-    RIGHT = 3
+    RIGHT = 1
+    DOWN = 2
+    LEFT = 3
 
 
 @dataclass
@@ -45,9 +45,9 @@ class Action:
 
 
 def convert_direction_to_vector(direction: Direction) -> Tuple[int, int]:
-    if direction == Direction.UP:
+    if direction == Direction.DOWN:
         return 0, 1
-    elif direction == Direction.DOWN:
+    elif direction == Direction.UP:
         return 0, -1
     elif direction == Direction.LEFT:
         return -1, 0
