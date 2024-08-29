@@ -87,8 +87,8 @@ class GeneralsEnvironment(ParallelEnv):
         infos = {agent_index: {} for agent_index in range(len(self.agents))}
         return observations, infos
 
-    def step(self, actions, agent_infos={}):
-        self.agent_infos = agent_infos
+    def step(self, actions, action_infos=None):
+        self.action_infos = action_infos
         player_dict_to_list = lambda player_dict: [
             player_dict[agent_index] for agent_index in range(len(self.agents))
         ]
@@ -109,12 +109,15 @@ class GeneralsEnvironment(ParallelEnv):
             for agent_index in range(len(self.agents))
         ]
 
+        # save wehther moves were legal before the board is updated
+        self.are_game_actions_legal = self.check_agent_actions_legal(game_actions)
+
         # Execute one tick of the game
         self.game_master.step(game_actions)
         self.n_step += 1
 
         observations = self._get_observations()
-        rewards = self._get_rewards(game_actions)
+        rewards = self._get_rewards()
         terminations = self._get_terminations()
         truncations = self._get_truncations()
         infos = self._get_infos()
@@ -145,15 +148,13 @@ class GeneralsEnvironment(ParallelEnv):
             for agent_index in range(len(self.agents))
         }
 
-    def _get_rewards(self, game_actions: List[Action] = None):
+    def _get_rewards(self):
         # reward component 1a: change in difference between agent's score and other agent's score
         # reward component 1b: whether action was legal
         # reward component 2: win/loss
         # final reward is component 2 + constant * component 1
         auxiliary_land_rewards = self.get_auxiliary_land_reward()
-        auxiliary_legal_move_rewards = self.get_auxiliary_legal_move_reward(
-            game_actions
-        )
+        auxiliary_legal_move_rewards = self.get_auxiliary_legal_move_reward()
         main_rewards = self.get_main_rewards()
         total_rewards = {
             agent_index: main_rewards[agent_index]
@@ -178,12 +179,15 @@ class GeneralsEnvironment(ParallelEnv):
                 )
         return main_rewards
 
-    def get_auxiliary_legal_move_reward(self, game_actions: List[Action]):
+    def check_agent_actions_legal(self, game_actions: List[Action]):
         return {
-            i: int(
-                self.game_master.board.is_action_valid(action=action, player_index=i)
-            )
+            i: self.game_master.board.is_action_valid(action=action, player_index=i)
             for i, action in enumerate(game_actions)
+        }
+
+    def get_auxiliary_legal_move_reward(self):
+        return {
+            i: int(is_legal) for i, is_legal in self.are_agent_actions_legal.items()
         }
 
     def get_auxiliary_land_reward(self):
@@ -213,10 +217,13 @@ class GeneralsEnvironment(ParallelEnv):
         return {agent_index: truncated for agent_index in range(len(self.agents))}
 
     def _get_infos(self):
-        merged_info_for_agent = lambda agent_index: {
-            **self.agent_infos[agent_index],
+        merged_info_for_agent = lambda agent_index: (
+            self.action_infos[agent_index] if self.action_infos is not None else {}
+        )
+        return {
+            agent_index: merged_info_for_agent(agent_index)
+            for agent_index in range(len(self.agents))
         }
-        return {agent_index: merged_info_for_agent(agent_index) for agent_index in range(len(self.agents))}
 
     def render(self):
         pass
