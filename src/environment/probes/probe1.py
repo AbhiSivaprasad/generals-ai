@@ -7,6 +7,7 @@ from typing import Dict, List
 from src.agents.agent import Agent
 from src.environment.action import Action
 from src.environment.board_generator import generate_board_state
+from src.environment.environment import GeneralsEnvironment
 from src.environment.game_master import GameMaster
 from src.environment.logger import Logger
 from src.training.input import (
@@ -15,7 +16,7 @@ from src.training.input import (
 )
 
 
-class ProbeOneEnvironment(ParallelEnv):
+class ProbeOneEnvironment(GeneralsEnvironment):
     metadata = {"name": "generals_v0"}
 
     def __init__(
@@ -87,7 +88,9 @@ class ProbeOneEnvironment(ParallelEnv):
         infos = {agent_index: {} for agent_index in range(len(self.agents))}
         return observations, infos
 
-    def step(self, actions):
+    def step(self, actions, agent_infos={}):
+        self.agent_infos = agent_infos
+        
         player_dict_to_list = lambda player_dict: [
             player_dict[agent_index] for agent_index in range(len(self.agents))
         ]
@@ -184,7 +187,7 @@ class ProbeOneEnvironment(ParallelEnv):
         return {agent_index: True for agent_index in range(len(self.agents))}
 
     def _get_infos(self):
-        return {agent_index: {} for agent_index in range(len(self.agents))}
+        return {agent_index: self.agent_infos[agent_index] for agent_index in range(len(self.agents))}
 
     def render(self):
         pass

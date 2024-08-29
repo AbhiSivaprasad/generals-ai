@@ -7,6 +7,7 @@ from typing import Dict, List
 from src.agents.agent import Agent
 from src.environment.action import Action
 from src.environment.board_generator import generate_board_state
+from src.environment.environment import GeneralsEnvironment
 from src.environment.game_master import GameMaster
 from src.environment.logger import Logger
 from src.training.input import (
@@ -15,7 +16,7 @@ from src.training.input import (
 )
 
 
-class ProbeZeroEnvironment(ParallelEnv):
+class ProbeZeroEnvironment(GeneralsEnvironment):
     """
     ProbeZeroEnvironment tests a single state with a constant reward = 1
     """
@@ -85,7 +86,9 @@ class ProbeZeroEnvironment(ParallelEnv):
         infos = {agent_index: {} for agent_index in range(len(self.agents))}
         return observations, infos
 
-    def step(self, actions):
+    def step(self, actions, agent_infos={}):
+        self.agent_infos = agent_infos
+        
         # Convert actions to the format expected by game_master
         game_actions = [
             Action.from_index(actions[agent_index], self.board_x_size)
@@ -130,7 +133,7 @@ class ProbeZeroEnvironment(ParallelEnv):
             )
             for agent_index in range(len(self.agents))
         }
-        infos = self._merge_info_dicts(is_game_action_legal=are_game_actions_legal)
+        infos = self._merge_info_dicts(agent_infos=self.agent_infos, is_game_action_legal=are_game_actions_legal)
         return infos
 
     def _merge_info_dicts(self, **info_dicts):

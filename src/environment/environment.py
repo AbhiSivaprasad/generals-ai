@@ -87,7 +87,8 @@ class GeneralsEnvironment(ParallelEnv):
         infos = {agent_index: {} for agent_index in range(len(self.agents))}
         return observations, infos
 
-    def step(self, actions):
+    def step(self, actions, agent_infos={}):
+        self.agent_infos = agent_infos
         player_dict_to_list = lambda player_dict: [
             player_dict[agent_index] for agent_index in range(len(self.agents))
         ]
@@ -212,7 +213,10 @@ class GeneralsEnvironment(ParallelEnv):
         return {agent_index: truncated for agent_index in range(len(self.agents))}
 
     def _get_infos(self):
-        return {agent_index: {} for agent_index in range(len(self.agents))}
+        merged_info_for_agent = lambda agent_index: {
+            **self.agent_infos[agent_index],
+        }
+        return {agent_index: merged_info_for_agent(agent_index) for agent_index in range(len(self.agents))}
 
     def render(self):
         pass

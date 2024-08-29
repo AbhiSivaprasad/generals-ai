@@ -149,17 +149,19 @@ target_net.load_state_dict(policy_net.state_dict())
 env = ProbeThreeEnvironment(
     agents=[
         CuriousGeorgeAgent(
+            0,
             policy_net=policy_net,
             epsilon_schedule=ExponentialHyperParameterSchedule(
                 initial_value=EPS_START, final_value=EPS_END, decay_rate=EPS_DECAY
             ),
         ),
-        CuriousGeorgeAgent(
-            policy_net=policy_net,
-            epsilon_schedule=ExponentialHyperParameterSchedule(
-                initial_value=EPS_START, final_value=EPS_END, decay_rate=EPS_DECAY
-            ),
-        ),
+        # CuriousGeorgeAgent(
+        #     policy_net=policy_net,
+        #     epsilon_schedule=ExponentialHyperParameterSchedule(
+        #         initial_value=EPS_START, final_value=EPS_END, decay_rate=EPS_DECAY
+        #     ),
+        # ),
+        RandomAgent(1),
     ],
     board_x_size=N_COLUMNS,
     board_y_size=N_ROWS,
@@ -294,6 +296,10 @@ for i_episode in range(num_episodes):
             agent_index: action
             for agent_index, (action, _) in actions_with_info.items()
         }
+        agent_infos = {
+            agent_index: agent_info
+            for agent_index, (_, agent_info) in actions_with_info.items()
+        }
 
         # check whether agent 0 took a legal move before taking the action
         _, action_info = actions_with_info[0]
@@ -305,7 +311,8 @@ for i_episode in range(num_episodes):
         )
 
         # take action
-        observation, rewards, terminated, truncated, info = env.step(actions)
+        print(agent_infos)
+        observation, rewards, terminated, truncated, info = env.step(actions, agent_infos)
         convert_agent_dict_to_tensor(rewards, device=device)
         convert_agent_dict_to_tensor(actions, dtype=torch.long, device=device)
         truncated = list(truncated.values())[0]
@@ -377,3 +384,5 @@ for i_episode in range(num_episodes):
 
 # %%
 # !find resources/replays -mindepth 1 -print0 | xargs -0 -P $(nproc) rm -rf
+
+# %%
