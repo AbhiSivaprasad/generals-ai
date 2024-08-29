@@ -26,7 +26,7 @@ if __name__ == "__main__":
     term = False
     trunc = False
     while not done:
-        obs, reward, term, trunc, info = env.step(actions=[a.move(obs, env) for a in env.agents])
+        obs, reward, term, trunc, info = env.step(actions=[a.move(obs, env)[0] for a in env.agents])
         term = list(term.values())[0]
         trunc = list(trunc.values())[0]
         done = term or trunc
