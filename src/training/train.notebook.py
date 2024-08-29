@@ -49,6 +49,7 @@ from src.utils.scheduler import ExponentialHyperParameterSchedule
 from src.utils.utils import delete_directory_contents
 from src.environment.action import Action
 from src.environment.probes.probe1 import ProbeOneEnvironment
+from src.environment.probes.probe2 import ProbeTwoEnvironment
 
 # %%
 # if GPU is to be used
@@ -58,8 +59,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 BATCH_SIZE = 128  # replay buffer sample size
 GAMMA = 0
 EPS_START = 0.9
-EPS_END = 0.30
-EPS_DECAY = 600000  # higher means slower exponential decay
+EPS_END = 0
+EPS_DECAY = 5000  # higher means slower exponential decay
 TAU = 0.005  # update rate of target network
 LR = 1e-4
 
@@ -143,7 +144,7 @@ target_net.load_state_dict(policy_net.state_dict())
 
 # %%
 # env = GeneralsEnvironment(
-env = ProbeOneEnvironment(
+env = ProbeTwoEnvironment(
     agents=[
         CuriousGeorgeAgent(
             policy_net=policy_net,
@@ -290,6 +291,17 @@ for i_episode in range(num_episodes):
             agent_index: action
             for agent_index, (action, _) in actions_with_info.items()
         }
+
+        # check whether agent 0 took a legal move before taking the action
+        _, action_info = actions_with_info[0]
+        is_action_legal = env.unwrapped.game_master.board.is_action_valid(
+            Action.from_index(
+                action_info["best_action"], n_columns=env.unwrapped.board_x_size
+            ),
+            player_index=0,
+        )
+
+        # take action
         observation, rewards, terminated, truncated, info = env.step(actions)
         convert_agent_dict_to_tensor(rewards, device=device)
         convert_agent_dict_to_tensor(actions, dtype=torch.long, device=device)
@@ -330,15 +342,6 @@ for i_episode in range(num_episodes):
                 },
                 step=global_step,
             )
-
-        # get legal move rate of agent 0
-        _, action_info = actions_with_info[0]
-        is_action_legal = env.unwrapped.game_master.board.is_action_valid(
-            Action.from_index(
-                action_info["best_action"], n_columns=env.unwrapped.board_x_size
-            ),
-            player_index=0,
-        )
 
         # log other metrics
         wandb.log(
