@@ -22,9 +22,11 @@ class FCNetwork(nn.Module):
         self.n_hidden_dim = n_hidden_dim
         self.n_hidden_layers = n_hidden_layers
 
+        # extra dim comes from the turn number
+        input_dim = n_rows * n_columns * n_input_channels
         self.input_layers = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(n_rows * n_columns * n_input_channels, n_hidden_dim),
+            nn.Linear(input_dim, n_hidden_dim),
             nn.ReLU(),
         )
         self.hidden_layers = []
@@ -36,7 +38,6 @@ class FCNetwork(nn.Module):
                 ]
             )
         self.hidden_layers = nn.Sequential(*self.hidden_layers)
-
         self.output_head = nn.Linear(n_hidden_dim, n_actions)
 
     def forward(self, x):

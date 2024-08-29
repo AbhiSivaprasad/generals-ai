@@ -135,7 +135,7 @@ class GeneralsEnvironment(ParallelEnv):
 
     def _get_observations(self):
         observation = convert_state_to_array(
-            self.game_master.board,
+            self.game_master,
             len(self.agents),
             fog_of_war=self.use_fog_of_war,
         )
