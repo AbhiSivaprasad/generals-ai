@@ -50,6 +50,7 @@ from src.utils.utils import delete_directory_contents
 from src.environment.action import Action
 from src.environment.probes.probe1 import ProbeOneEnvironment
 from src.environment.probes.probe2 import ProbeTwoEnvironment
+from src.environment.probes.probe3 import ProbeThreeEnvironment
 
 # %%
 # if GPU is to be used
@@ -144,7 +145,7 @@ target_net.load_state_dict(policy_net.state_dict())
 
 # %%
 # env = GeneralsEnvironment(
-env = ProbeTwoEnvironment(
+env = ProbeThreeEnvironment(
     agents=[
         CuriousGeorgeAgent(
             policy_net=policy_net,
