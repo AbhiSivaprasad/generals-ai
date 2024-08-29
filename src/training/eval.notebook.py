@@ -23,7 +23,8 @@ import numpy as np
 from pathlib import Path
 from src.agents.random_agent import RandomAgent
 from src.agents.curiousgeorge_agent import CuriousGeorgeAgent
-from src.training.dqn.dqn import DQN
+from src.training.models.dqn.dqn import DQN
+from src.training.models.fc_network import FCNetwork
 from src.environment.logger import Logger
 from src.environment.environment import GeneralsEnvironment
 from src.training.utils import convert_agent_dict_to_tensor
@@ -44,8 +45,8 @@ from src.environment.action import Action, Direction
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # %%
-model = DQN.load_checkpoint(
-    Path("/home/ubuntu/generals-ai/resources/checkpoints/checkpoint_1200.pth")
+model = FCNetwork.load_checkpoint(
+    Path("/home/ubuntu/generals-ai/resources/checkpoints/checkpoint_10000.pth")
 ).to(device)
 
 # %% [markdown]
@@ -59,8 +60,8 @@ board = Board(num_rows=2, num_cols=2)
 
 # %%
 board_state = [
-    [(TileType.GENERAL, 0, 1), (TileType.NORMAL, None, None)],
-    [(TileType.NORMAL, 0, 4), (TileType.GENERAL, 1, 1)],
+    [(TileType.GENERAL, 0, 1), (TileType.NORMAL, 0, 0)],
+    [(TileType.NORMAL, 0, 0), (TileType.GENERAL, 1, 1)],
 ]
 
 # %%
@@ -96,7 +97,15 @@ optimal_action_index = optimal_action.to_index(n_columns=board.num_cols)
 
 # %%
 state_action_values = model(state)[0]
-state_action_values = state_action_values / state_action_values.norm()
+# state_action_values = state_action_values / state_action_values.norm()
+
+# %%
+state_action_values
+
+# %%
+board.is_action_valid(
+    Action(do_nothing=False, startx=0, starty=1, direction=Direction.LEFT), 0
+)
 
 # %%
 state_action_values[optimal_action_index].item()

@@ -23,24 +23,23 @@ class CuriousGeorgeAgent(Agent):
         sample = random.random()
         self.steps += 1
         self.epsilon = self.epsilon_schedule.get(self.steps)
-        best_action = (
-            torch.tensor(
-                [[list(env.action_spaces.values())[0].sample()]],
-                device=state.device,
-                dtype=torch.long,
-            )
-            .squeeze()
-            .item()
-        )
+
+        # argmax returns the indices of the maximum values along the specified dimension
+        best_action = self.policy_net(state.unsqueeze(0)).argmax(dim=1).squeeze().item()
         info = {"best_action": best_action}
         if sample > self.epsilon:
             with torch.no_grad():
-                # argmax returns the indices of the maximum values along the specified dimension
-                return (
-                    self.policy_net(state.unsqueeze(0)).argmax(dim=1).squeeze().item()
-                ), info
+                return best_action, info
         else:
-            return best_action, info
+            return (
+                torch.tensor(
+                    [[list(env.action_spaces.values())[0].sample()]],
+                    device=state.device,
+                    dtype=torch.long,
+                )
+                .squeeze()
+                .item()
+            ), info
 
     def reset(self):
         pass
