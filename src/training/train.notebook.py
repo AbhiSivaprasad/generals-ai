@@ -57,8 +57,8 @@ from src.environment.probes.probe3 import ProbeThreeEnvironment
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # %%
-REPLAY_MEMORY_SIZE = 50000
-BATCH_SIZE = 1024  # replay buffer sample size
+REPLAY_MEMORY_SIZE = 10000
+BATCH_SIZE = 128  # replay buffer sample size
 GAMMA = 0
 EPS_START = 0.9
 EPS_END = 0.01

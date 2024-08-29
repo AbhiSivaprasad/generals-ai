@@ -88,22 +88,10 @@ class GeneralsEnvironment(ParallelEnv):
         return observations, infos
 
     def step(self, actions, action_infos=None):
+        pre_action_observation = self._get_observations()
         self.action_infos = action_infos
-        player_dict_to_list = lambda player_dict: [
-            player_dict[agent_index] for agent_index in range(len(self.agents))
-        ]
 
-        # when serializing observations, serialize them channels-last instead of channels-first i.e. (C, H, W) -> (H, W, C)
-        self.game_master.logger.log_info(
-            "obs_tensor",
-            [
-                a.transpose(1, 2, 0).tolist()
-                for a in player_dict_to_list(self._get_observations())
-            ],
-            self.n_step,
-        )
-
-        # Convert actions to the format expected by game_master
+        # convert actions to the format expected by game_master
         game_actions = [
             Action.from_index(actions[agent_index], self.board_x_size)
             for agent_index in range(len(self.agents))
@@ -112,28 +100,18 @@ class GeneralsEnvironment(ParallelEnv):
         # save wehther moves were legal before the board is updated
         self.are_game_actions_legal = self.check_agent_actions_legal(game_actions)
 
-        # Execute one tick of the game
+        # execute one tick of the game
         self.game_master.step(game_actions)
-        self.n_step += 1
 
+        # new environment information
         observations = self._get_observations()
         rewards = self._get_rewards()
         terminations = self._get_terminations()
         truncations = self._get_truncations()
         infos = self._get_infos()
 
-        self.game_master.logger.log_info(
-            "rewards", player_dict_to_list(rewards), self.n_step - 1
-        )
-        self.game_master.logger.log_info(
-            "action_indices", player_dict_to_list(actions), self.n_step - 1
-        )
-        self.game_master.logger.log_info(
-            "actions", [vars(a) for a in game_actions], self.n_step - 1
-        )
-        self.game_master.logger.log_info(
-            "agent_infos", player_dict_to_list(infos), self.n_step - 1
-        )
+        self._log(pre_action_observation, rewards, actions, game_actions, infos)
+        self.n_step += 1
 
         return observations, rewards, terminations, truncations, infos
 
@@ -224,6 +202,32 @@ class GeneralsEnvironment(ParallelEnv):
             agent_index: merged_info_for_agent(agent_index)
             for agent_index in range(len(self.agents))
         }
+
+    def _log(self, pre_action_observation, rewards, actions, game_actions, infos):
+        player_dict_to_list = lambda player_dict: [
+            player_dict[agent_index] for agent_index in range(len(self.agents))
+        ]
+        # when serializing observations, serialize them channels-last instead of channels-first i.e. (C, H, W) -> (H, W, C)
+        self.game_master.logger.log_info(
+            "obs_tensor",
+            [
+                a.transpose(1, 2, 0).tolist()
+                for a in player_dict_to_list(pre_action_observation)
+            ],
+            self.n_step,
+        )
+        self.game_master.logger.log_info(
+            "rewards", player_dict_to_list(rewards), self.n_step
+        )
+        self.game_master.logger.log_info(
+            "action_indices", player_dict_to_list(actions), self.n_step
+        )
+        self.game_master.logger.log_info(
+            "actions", [vars(a) for a in game_actions], self.n_step
+        )
+        self.game_master.logger.log_info(
+            "agent_infos", player_dict_to_list(infos), self.n_step
+        )
 
     def render(self):
         pass
