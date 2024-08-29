@@ -16,7 +16,7 @@ from src.training.input import (
 
 
 class ProbeThreeEnvironment(ParallelEnv):
-    metadata = {"name": "generals_v0"}
+    metadata = {"name": "probe3"}
 
     def __init__(
         self,
@@ -43,7 +43,7 @@ class ProbeThreeEnvironment(ParallelEnv):
 
         # Define action and observation spaces
         self.action_spaces = {
-            agent_index: spaces.Discrete(board_x_size * board_y_size * 4)
+            agent_index: spaces.Discrete(board_x_size * board_y_size * 4 + 1)
             for agent_index in range(len(agents))
         }
         self.observation_spaces = {
@@ -87,7 +87,9 @@ class ProbeThreeEnvironment(ParallelEnv):
         infos = {agent_index: {} for agent_index in range(len(self.agents))}
         return observations, infos
 
-    def step(self, actions):
+    def step(self, actions, agent_infos={}):
+        self.agent_infos = agent_infos
+        
         player_dict_to_list = lambda player_dict: [
             player_dict[agent_index] for agent_index in range(len(self.agents))
         ]
@@ -207,7 +209,10 @@ class ProbeThreeEnvironment(ParallelEnv):
         return {agent_index: truncated for agent_index in range(len(self.agents))}
 
     def _get_infos(self):
-        return {agent_index: {} for agent_index in range(len(self.agents))}
+        merged_info_for_agent = lambda agent_index: {
+            **self.agent_infos[agent_index],
+        }
+        return {agent_index: merged_info_for_agent(agent_index) for agent_index in range(len(self.agents))}
 
     def render(self):
         pass
