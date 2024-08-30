@@ -10,5 +10,4 @@ class ProbeThreeEnvironment(GeneralsEnvironment):
             * (auxiliary_land_reward[agent_index])
             for agent_index in range(len(self.agents))
         }
-        print(total_rewards)
         return total_rewards
