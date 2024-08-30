@@ -27,6 +27,7 @@ from src.training.models.dqn.dqn import DQN
 from src.training.models.fc_network import FCNetwork
 from src.environment.logger import Logger
 from src.environment.environment import GeneralsEnvironment
+from src.environment.probes.probe3 import ProbeThreeEnvironment
 from src.training.utils import convert_agent_dict_to_tensor
 from collections import defaultdict
 from itertools import count
@@ -40,6 +41,7 @@ from src.environment.board import Board
 from src.environment.tile import TileType, Tile
 from src.training.input import convert_state_to_array, convert_tile_to_array
 from src.environment.action import Action, Direction
+from src.utils.utils import delete_directory_contents
 
 # %%
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -127,9 +129,13 @@ def simulate_game(env, logger: Logger):
     num_agents = len(env.unwrapped.agents)
     metrics = defaultdict(dict)
     for t in count():
-        actions = {
+        actions_with_info = {
             agent_index: agent.move(state[agent_index], env)
             for agent_index, agent in enumerate(env.unwrapped.agents)
+        }
+        actions = {
+            agent_index: action
+            for agent_index, (action, _) in actions_with_info.items()
         }
         observation, rewards, terminated, truncated, info = env.step(actions)
         convert_agent_dict_to_tensor(rewards, device=device)
@@ -181,7 +187,7 @@ def eval_checkpoints(
     num_games: int = 100,
 ):
     models = [
-        DQN.load_checkpoint(
+        FCNetwork.load_checkpoint(
             checkpoint_dir / f"checkpoint_{checkpoint_number}.pth", device=device
         )
         for checkpoint_number in checkpoint_numbers
@@ -190,11 +196,13 @@ def eval_checkpoints(
     for i in tqdm(range(len(models))):
         for j in range(i + 1, len(models)):
             agent1 = CuriousGeorgeAgent(
-                models[i],
+                policy_net=models[i],
+                player_index=0,
                 epsilon_schedule=ConstantHyperParameterSchedule(0.1),
             )
             agent2 = CuriousGeorgeAgent(
-                models[j],
+                policy_net=models[j],
+                player_index=1,
                 epsilon_schedule=ConstantHyperParameterSchedule(0.1),
             )
             env = GeneralsEnvironment(
@@ -244,14 +252,14 @@ def eval_checkpoints(
 # %%
 checkpoint_dir = Path("./resources/checkpoints")
 checkpoint_numbers = get_checkpoint_numbers(checkpoint_dir)
-checkpoint_numbers = [c for c in checkpoint_numbers if c % 4000 == 0]
+checkpoint_numbers = [c for c in checkpoint_numbers if c % 6000 == 0]
 
 # %%
 overall_metrics = eval_checkpoints(
     checkpoint_dir=checkpoint_dir,
     checkpoint_numbers=checkpoint_numbers,
     base_log_dir=Path("./resources/replays/tournament/"),
-    num_games=15,
+    num_games=5,
 )
 
 # %%
@@ -261,21 +269,29 @@ overall_metrics
 # ### Eval checkpoints against RandomAgent
 
 # %%
+N_ROWS = 2
+N_COLUMNS = 2
+NORMAL_TILE_INCREMENT_FREQUENCY = 2
+
+# %%
 LOG_DIR = Path("./resources/replays/vs_random/")
 CHECKPOINT_DIR = Path("./resources/checkpoints")
 LOG_DIR.mkdir(parents=True, exist_ok=True)
-CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
+
+# delete old logs
+delete_directory_contents(LOG_DIR)
 
 
 # %%
 def eval_checkpoint(checkpoint_path: Path, log_dir: Path, num_games: int = 100):
-    model = DQN.load_checkpoint(checkpoint_path, device=device)
-    agent = CuriousGeorgeAgent(model, train=False)
+    model = FCNetwork.load_checkpoint(checkpoint_path, device=device)
+    agent = CuriousGeorgeAgent(policy_net=model, player_index=1)
     random_agent = RandomAgent(player_index=0)
-    env = GeneralsEnvironment(
+    env = ProbeThreeEnvironment(
         agents=[random_agent, agent],
         board_x_size=N_COLUMNS,
         board_y_size=N_ROWS,
+        normal_tile_increment_frequency=NORMAL_TILE_INCREMENT_FREQUENCY,
     )
 
     metrics = []
@@ -300,9 +316,9 @@ def get_checkpoint_paths(directory):
     )
 
 
-def evaluate_checkpoints(checkpoint_paths, num_games=100):
+def evaluate_checkpoints(checkpoint_paths, num_games=20):
     results = []
-    for path in checkpoint_paths:
+    for path in tqdm(checkpoint_paths):
         print(f"Evaluating {path}")
         metrics = eval_checkpoint(
             checkpoint_path=path, log_dir=LOG_DIR, num_games=num_games
@@ -334,7 +350,7 @@ def plot_metrics(results):
 
 # %%
 checkpoint_paths = get_checkpoint_paths(CHECKPOINT_DIR)
-results = evaluate_checkpoints(checkpoint_paths)
-plot_metrics(results)
 
 # %%
+results = evaluate_checkpoints(checkpoint_paths)
+plot_metrics(results)

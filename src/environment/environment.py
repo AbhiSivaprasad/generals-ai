@@ -98,7 +98,7 @@ class GeneralsEnvironment(ParallelEnv):
         ]
 
         # save wehther moves were legal before the board is updated
-        self.are_game_actions_legal = self.check_agent_actions_legal(game_actions)
+        self.are_agent_actions_legal = self.check_agent_actions_legal(game_actions)
 
         # execute one tick of the game
         self.game_master.step(game_actions)

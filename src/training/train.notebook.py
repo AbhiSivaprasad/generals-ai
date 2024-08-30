@@ -61,8 +61,8 @@ REPLAY_MEMORY_SIZE = 10000
 BATCH_SIZE = 128  # replay buffer sample size
 GAMMA = 0
 EPS_START = 0.9
-EPS_END = 0.01
-EPS_DECAY = 5000  # higher means slower exponential decay
+EPS_END = 0.05
+EPS_DECAY = 50000  # higher means slower exponential decay
 TAU = 0.005  # update rate of target network
 LR = 1e-4
 
@@ -307,7 +307,9 @@ for i_episode in range(num_episodes):
         )
 
         # take action
-        observation, rewards, terminated, truncated, info = env.step(actions)
+        observation, rewards, terminated, truncated, info = env.step(
+            actions, action_infos=actions_with_info
+        )
         convert_agent_dict_to_tensor(rewards, device=device)
         convert_agent_dict_to_tensor(actions, dtype=torch.long, device=device)
         truncated = list(truncated.values())[0]
