@@ -96,6 +96,7 @@ class GameMaster:
             if dest_tile.army < start_tile.army - 1:
                 # attack is successful--destination cell is captured
                 old_dest_player_index = dest_tile.player_index
+                print('DEST TILE PLAYER INDEX', dest_tile.player_index)
                 dest_tile.player_index = start_tile.player_index
                 dest_tile.army = (start_tile.army - 1) - dest_tile.army
 

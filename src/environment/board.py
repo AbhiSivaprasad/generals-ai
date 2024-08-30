@@ -91,6 +91,7 @@ class Board:
         if destination_tile is None:
             return False
 
+        print('tile owner is', start_tile.player_index, 'player index is', player_index)
         # check that player owns start tile
         if start_tile.player_index != player_index:
             return False

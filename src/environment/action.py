@@ -9,6 +9,16 @@ class Direction(Enum):
     LEFT = 2
     RIGHT = 3
 
+def get_direction_from_str(direction_str: str) -> Direction:
+    if direction_str == 'up':
+        return Direction.UP
+    elif direction_str == 'down':
+        return Direction.DOWN
+    elif direction_str == 'left':
+        return Direction.LEFT
+    elif direction_str == 'right':
+        return Direction.RIGHT
+
 
 @dataclass
 class Action:
@@ -21,6 +31,14 @@ class Action:
     startx: Optional[int] = None
     starty: Optional[int] = None
     direction: Optional[Direction] = None
+
+    def serialize(self) -> dict:
+        return {
+            'do_nothing': self.do_nothing,
+            'startx': self.startx,
+            'starty': self.starty,
+            'direction': self.direction.name if self.direction else None
+        }
 
     def to_index(self, n_columns: int):
         if self.do_nothing:
