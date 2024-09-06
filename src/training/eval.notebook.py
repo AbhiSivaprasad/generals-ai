@@ -28,6 +28,7 @@ from src.training.models.fc_network import FCNetwork
 from src.environment.logger import Logger
 from src.environment.environment import GeneralsEnvironment
 from src.environment.probes.probe3 import ProbeThreeEnvironment
+from src.environment.probes.probe4 import ProbeFourEnvironment
 from src.training.utils import convert_agent_dict_to_tensor
 from collections import defaultdict
 from itertools import count
@@ -48,8 +49,55 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # %%
 model = FCNetwork.load_checkpoint(
-    Path("/home/ubuntu/generals-ai/resources/checkpoints/checkpoint_10000.pth")
+    Path("/home/ubuntu/generals-ai/resources/checkpoints/checkpoint_49500.pth")
 ).to(device)
+
+
+# %% [markdown]
+# ### Helpers
+
+# %%
+def simulate_game(env, logger: Logger):
+    """Simulate a game between players and return the total reward collected, duration, and which player won"""
+    # Initialize the environment and get its state
+    state, info = env.reset(logger=logger)
+    convert_agent_dict_to_tensor(state, device=device)
+    num_agents = len(env.unwrapped.agents)
+    metrics = defaultdict(dict)
+    for t in count():
+        actions_with_info = {
+            agent_index: agent.move(state[agent_index], env)
+            for agent_index, agent in enumerate(env.unwrapped.agents)
+        }
+        actions = {
+            agent_index: action
+            for agent_index, (action, _) in actions_with_info.items()
+        }
+        observation, rewards, terminated, truncated, info = env.step(actions)
+        convert_agent_dict_to_tensor(rewards, device=device)
+        convert_agent_dict_to_tensor(actions, dtype=torch.long, device=device)
+        truncated = list(truncated.values())[0]
+        terminated = list(terminated.values())[0]
+        done = terminated or truncated
+
+        # update metrics
+        for agent_index, reward in rewards.items():
+            metrics[agent_index]["reward"] = (
+                metrics[agent_index].get("reward", 0) + reward.item()
+            )
+
+        if done:
+            terminal_status = {
+                agent_index: main_reward * 0.5 + 0.5
+                for agent_index, main_reward in env.unwrapped.get_main_rewards().items()
+            }
+            for agent_index, status in terminal_status.items():
+                metrics[agent_index]["won"] = status
+                metrics[agent_index]["duration"] = t
+            return metrics
+
+
+# %%
 
 # %% [markdown]
 # ### Probe probability
@@ -118,47 +166,6 @@ state_action_values[optimal_action_index].item()
 # %%
 N_ROWS = 2
 N_COLUMNS = 2
-
-
-# %%
-def simulate_game(env, logger: Logger):
-    """Simulate a game between players and return the total reward collected, duration, and which player won"""
-    # Initialize the environment and get its state
-    state, info = env.reset(logger=logger)
-    convert_agent_dict_to_tensor(state, device=device)
-    num_agents = len(env.unwrapped.agents)
-    metrics = defaultdict(dict)
-    for t in count():
-        actions_with_info = {
-            agent_index: agent.move(state[agent_index], env)
-            for agent_index, agent in enumerate(env.unwrapped.agents)
-        }
-        actions = {
-            agent_index: action
-            for agent_index, (action, _) in actions_with_info.items()
-        }
-        observation, rewards, terminated, truncated, info = env.step(actions)
-        convert_agent_dict_to_tensor(rewards, device=device)
-        convert_agent_dict_to_tensor(actions, dtype=torch.long, device=device)
-        truncated = list(truncated.values())[0]
-        terminated = list(terminated.values())[0]
-        done = terminated or truncated
-
-        # update metrics
-        for agent_index, reward in rewards.items():
-            metrics[agent_index]["reward"] = (
-                metrics[agent_index].get("reward", 0) + reward.item()
-            )
-
-        if done:
-            terminal_status = {
-                agent_index: main_reward * 0.5 + 0.5
-                for agent_index, main_reward in env.unwrapped.get_main_rewards().items()
-            }
-            for agent_index, status in terminal_status.items():
-                metrics[agent_index]["won"] = status
-                metrics[agent_index]["duration"] = t
-            return metrics
 
 
 # %%
@@ -269,8 +276,8 @@ overall_metrics
 # ### Eval checkpoints against RandomAgent
 
 # %%
-N_ROWS = 2
-N_COLUMNS = 2
+N_ROWS = 3
+N_COLUMNS = 3
 NORMAL_TILE_INCREMENT_FREQUENCY = 2
 
 # %%
@@ -287,7 +294,7 @@ def eval_checkpoint(checkpoint_path: Path, log_dir: Path, num_games: int = 100):
     model = FCNetwork.load_checkpoint(checkpoint_path, device=device)
     agent = CuriousGeorgeAgent(policy_net=model, player_index=1)
     random_agent = RandomAgent(player_index=0)
-    env = ProbeThreeEnvironment(
+    env = ProbeFourEnvironment(
         agents=[random_agent, agent],
         board_x_size=N_COLUMNS,
         board_y_size=N_ROWS,
@@ -302,9 +309,9 @@ def eval_checkpoint(checkpoint_path: Path, log_dir: Path, num_games: int = 100):
 
     # compute overall stats
     overall_metrics = {}
-    overall_metrics["duration"] = np.mean([m[1]["duration"] for m in metrics])
-    overall_metrics["reward"] = np.mean([m[1]["reward"] for m in metrics])
-    overall_metrics["win_rate"] = np.mean([m[1]["won"] for m in metrics])
+    overall_metrics["duration"] = np.array([m[1]["duration"] for m in metrics])
+    overall_metrics["reward"] = np.array([m[1]["reward"] for m in metrics])
+    overall_metrics["win"] = np.array([m[1]["won"] for m in metrics])
     return overall_metrics
 
 
@@ -351,6 +358,30 @@ def plot_metrics(results):
 # %%
 checkpoint_paths = get_checkpoint_paths(CHECKPOINT_DIR)
 
+# %% [markdown]
+# #### Eval a given checkpoint
+
+# %%
+CHECKPOINT = "checkpoint_49500.pth"
+results = eval_checkpoint(CHECKPOINT_DIR / CHECKPOINT, log_dir=LOG_DIR, num_games=100)
+print(results)
+
+# %%
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(len(results.keys()), 1, figsize=(10, 5 * len(results.keys())))
+for idx, key in enumerate(results.keys()):
+    ax[idx].hist(results[key], bins='auto')
+plt.show()
+
+# %% [markdown]
+# #### Eval all checkpoints
+
 # %%
 results = evaluate_checkpoints(checkpoint_paths)
 plot_metrics(results)
+
+# %% [markdown]
+#
+
+# %%

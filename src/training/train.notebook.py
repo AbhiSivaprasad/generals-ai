@@ -45,30 +45,31 @@ from src.training.input import (
 from src.training.models.dqn.replay_memory import ReplayMemory, Transition
 from src.environment.logger import Logger
 from src.training.utils import convert_agent_dict_to_tensor
-from src.utils.scheduler import ExponentialHyperParameterSchedule
+from src.utils.scheduler import ExponentialHyperParameterSchedule, LinearHyperParameterSchedule
 from src.utils.utils import delete_directory_contents
 from src.environment.action import Action
 from src.environment.probes.probe1 import ProbeOneEnvironment
 from src.environment.probes.probe2 import ProbeTwoEnvironment
 from src.environment.probes.probe3 import ProbeThreeEnvironment
+from src.environment.probes.probe4 import ProbeFourEnvironment
 
 # %%
 # if GPU is to be used
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # %%
-REPLAY_MEMORY_SIZE = 10000
-BATCH_SIZE = 128  # replay buffer sample size
-GAMMA = 0
-EPS_START = 0.9
-EPS_END = 0.05
-EPS_DECAY = 50000  # higher means slower exponential decay
-TAU = 0.005  # update rate of target network
+REPLAY_MEMORY_SIZE = 10_000_000
+BATCH_SIZE = 512  # replay buffer sample size
+GAMMA = 0.9
+EPS_START = 1.0
+EPS_END = 0.1
+EPS_DECAY = 1_500_000  # higher means slower decay
+TAU = 0.0005  # update rate of target network
 LR = 1e-4
 
 # %%
-N_ROWS = 2
-N_COLUMNS = 2
+N_ROWS = 3
+N_COLUMNS = 3
 FOG_OF_WAR = False
 NORMAL_TILE_INCREMENT_FREQUENCY = 2
 INPUT_CHANNELS = get_input_channel_dimension_size(FOG_OF_WAR)
@@ -146,19 +147,19 @@ target_net.load_state_dict(policy_net.state_dict())
 
 # %%
 # env = GeneralsEnvironment(
-env = ProbeThreeEnvironment(
+env = ProbeFourEnvironment(
     agents=[
         CuriousGeorgeAgent(
             player_index=0,
             policy_net=policy_net,
-            epsilon_schedule=ExponentialHyperParameterSchedule(
+            epsilon_schedule=LinearHyperParameterSchedule(
                 initial_value=EPS_START, final_value=EPS_END, decay_rate=EPS_DECAY
             ),
         ),
         CuriousGeorgeAgent(
             player_index=1,
             policy_net=policy_net,
-            epsilon_schedule=ExponentialHyperParameterSchedule(
+            epsilon_schedule=LinearHyperParameterSchedule(
                 initial_value=EPS_START, final_value=EPS_END, decay_rate=EPS_DECAY
             ),
         ),
@@ -277,9 +278,9 @@ delete_directory_contents(LOG_DIR)
 delete_directory_contents(CHECKPOINT_DIR)
 
 # %%
-num_episodes = 50000
-log_interval = 50
-checkpoint_interval = 500
+num_episodes = 500_000
+log_interval = 500
+checkpoint_interval = 2000
 global_step = 0
 for i_episode in range(num_episodes):
     logger = Logger()
@@ -336,19 +337,20 @@ for i_episode in range(num_episodes):
         state = next_state
 
         # Perform one step of the optimization (on the policy network)
-        metrics = optimize_model()
-        if metrics is not None:
-            minibatch_loss, minibatch_reward_magnitude, minibatch_qvalue_magnitude = (
-                metrics
-            )
-            wandb.log(
-                {
-                    "loss": minibatch_loss,
-                    "reward_magnitude": minibatch_reward_magnitude,
-                    "qvalue_magnitude": minibatch_qvalue_magnitude,
-                },
-                step=global_step,
-            )
+        if global_step >= 1e3 * BATCH_SIZE:
+            metrics = optimize_model()
+            if metrics is not None:
+                minibatch_loss, minibatch_reward_magnitude, minibatch_qvalue_magnitude = (
+                    metrics
+                )
+                wandb.log(
+                    {
+                        "loss": minibatch_loss,
+                        "reward_magnitude": minibatch_reward_magnitude,
+                        "qvalue_magnitude": minibatch_qvalue_magnitude,
+                    },
+                    step=global_step,
+                )
 
         # log other metrics
         wandb.log(
@@ -379,5 +381,12 @@ for i_episode in range(num_episodes):
                 logger.write(LOG_DIR / f"{i_episode}.json")
             break
 
+# %% [markdown]
+# # Delete replays from training run
+
 # %%
 # !find resources/replays -mindepth 1 -print0 | xargs -0 -P $(nproc) rm -rf
+
+# %%
+
+# %%
