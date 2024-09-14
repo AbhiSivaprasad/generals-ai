@@ -20,9 +20,11 @@ class DQN(nn.Module):
         spatial_dropout=0.0,
         encoder_dim=64,
         encoder_depth=2,
-        block_dim=64,        
+        block_dim=64,
+        *args,
+        **kwargs
     ):
-        super().__init__()
+        super().__init__(*args, **kwargs)
         # self.encoder = nn.Sequential(
         #     nn.Conv2d(input_channels, encoder_dim, kernel_size=1, padding="same"), 
         #     *[
@@ -58,17 +60,17 @@ class DQN(nn.Module):
         #     nn.Linear(fc_dim, num_actions)
         # )
         
-        simple_dim = 16
+        simple_dim = 128
         self.simple_net = nn.Sequential(
             nn.Conv2d(input_channels, simple_dim, 1, padding="same"),
             nn.Conv2d(simple_dim, simple_dim, 3, padding=1),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Conv2d(simple_dim, simple_dim, 3, padding=1),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Conv2d(simple_dim, simple_dim, 3, padding=1),
-            nn.AvgPool2d(3, 3),
+            nn.MaxPool2d(3, stride=2, padding=1),
             nn.Flatten(),
-            nn.Linear(simple_dim * (n_rows // 3) * (n_cols // 3), num_actions),
+            nn.Linear(simple_dim * ((n_rows+1) // 2) * ((n_cols + 1) // 2), num_actions),
             nn.Linear(num_actions, num_actions),
         )
 

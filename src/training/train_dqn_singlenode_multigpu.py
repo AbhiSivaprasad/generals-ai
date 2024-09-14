@@ -1,12 +1,15 @@
 import logging
+import math
 import os
 import sys
+
+from src.training.step import optimize_step
 
 sys.dont_write_bytecode = True
 
 import copy
 import time
-from typing import Dict
+from typing import Dict, List, Tuple
 import gymnasium as gym
 import numpy as np
 import ray
@@ -51,7 +54,7 @@ class DQNTrainingConfig(object):
     num_steps: int = None
     learning_rate: float = None
     batch_size: int = None
-    gamma: float = None
+    gamma = None
     
     use_wandb: bool = None
     
@@ -120,10 +123,12 @@ class EnvRunner:
     agent: GymAgent
     env: GeneralsEnvironment
     
-    _local_buffer: list[Experience] = []
+    train_steps: int = -1
+    
+    _local_buffer: List[Tuple[Experience, int]] = []
     
     def _handle_observation(self, experience: Experience):
-        self._local_buffer.append(experience)
+        self._local_buffer.append((experience, self.train_steps))
         if len(self._local_buffer) >= 5000:
             self.buffer.add.remote(self._local_buffer)
             self._local_buffer = []
@@ -147,10 +152,11 @@ class EnvRunner:
         if isinstance(agent, DQNAgent):
             dqn_agent: DQNAgent = agent
             model = dqn_agent.model
-            if dqn_agent.model is None:
-                model: torch.nn.Module = DQN(config.input_channels, config.num_actions, config.n_rows, config.n_cols).cuda().eval()
-            model.load_state_dict(ray.get(self.server.get_target_net.remote()))
-            dqn_agent.update_model(model, device=torch.device("cuda"))
+            with torch.inference_mode():
+                if dqn_agent.model is None:
+                    model: torch.nn.Module = DQN(config.input_channels, config.num_actions, config.n_rows, config.n_cols).requires_grad_(False).eval().cuda()
+                model.load_state_dict(ray.get(self.server.get_target_net.remote()))
+                dqn_agent.update_model(model, device=torch.device("cuda"))
             gc.collect()
             torch.cuda.empty_cache() 
     
@@ -161,17 +167,18 @@ class EnvRunner:
         self._fetch_updates()
         last_train_steps = 0
         while True:
-            train_steps = ray.get(self.server.get_training_steps.remote())
-            if train_steps - last_train_steps >= self.config.target_update_freq:
+            self.train_steps = ray.get(self.server.get_training_steps.remote())
+            if self.train_steps - last_train_steps >= self.config.target_update_freq:
                 print("[INFO] Fetching target network updates...")
                 self._fetch_updates()
-                last_train_steps = train_steps
+                last_train_steps = self.train_steps
             agent_seed = rng.integers(0, 2**29)   
             self.env.reset()
             print("[INFO] Running episode ", episodes + 1)
-            batchsize = 25
+            batchsize = 5
             self.env.agent.run_episodes(seed=agent_seed, n_runs=batchsize)
             episodes += batchsize
+            sys.stdout.flush()
 
 # Define training loop
 # @ray.remote(num_cpus=1, num_gpus=0.1, memory=1*1024**3)
@@ -201,6 +208,8 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
         print(f"Buffer size: {size}")
         time.sleep(5)
         size = ray.get(buffer.size.remote())
+    print(f"Buffer size: {size}")
+    sys.stdout.flush()
         
     if config.use_wandb:
         run = wandb.init(
@@ -212,56 +221,36 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
     print("Starting training...")
     for train_step in trange(config.num_steps, miniters=20):
         ray.get(server.increment_training_steps.remote())
-        print("Training step:", train_step)
+        # print("Training step:", train_step)
         
         data = ray.get(buffer.sample.remote(config.batch_size))
-        experience_batch = tuple([list(t) for t in zip(*data)])
-        s_t, a_t, r_t_1, s_t_1, d_t_1 = experience_batch
-        # print("[INFO] Sampled experience batch: ", experience_batch)
+        experiences, steps = tuple(map(list, zip(*data)))
         
-        # decouple (turn, grid) ObsType
-        s_t = np.array([np.array(grid) for (_, grid) in s_t])
-        s_t_1 = np.array([np.array(grid) for (_, grid) in s_t_1])
+        loss, step_info = optimize_step(target_net, policy_net, optimizer, experiences, config.gamma)
         
-        with torch.inference_mode():
-            s_t_1 = torch.tensor(s_t_1, dtype=torch.float32).cuda()
-            # double DQN
-            max_action = torch.argmax(policy_net(s_t_1), dim=-1)
-            target_q_value: torch.Tensor = target_net(s_t_1)[:config.batch_size, max_action]
-            
-        
-        s_t = torch.tensor(s_t, dtype=torch.float32).cuda().requires_grad_(True)
-        a_t = [int(a) for a in a_t]
-        r_t_1 = torch.tensor(r_t_1, dtype=torch.float32).cuda().requires_grad_(False)
-        d_t_1 = torch.tensor(d_t_1, dtype=torch.float32).cuda().requires_grad_(False)
-        target_q_value = target_q_value.cuda().requires_grad_(False)
-        
-        predicted_q_vals: torch.Tensor = policy_net(s_t)[:config.batch_size, a_t]
-
-        tde = (r_t_1 + config.gamma * target_q_value * (1 - d_t_1)) - predicted_q_vals
-        loss = tde.pow(2).mean()
-        
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        predicted_q_vals = step_info["predicted_q_vals"]
+        rewards = step_info["r_t_1"]
         
         losses.append(loss.item())
         
-        print("Action distribution: ", np.histogram(np.array(a_t), bins=range(config.num_actions))[0])
+        # print("Action distribution: ", np.histogram(np.array(a_t), bins=range(config.num_actions))[0])
         
         if config.use_wandb:
             grad_params = [p for p in policy_net.parameters() if p.grad is not None and p.requires_grad]
             grad_norm = torch.norm(torch.stack([a.grad.detach().data.norm(2) for a in grad_params]), 2.0)
             grad_max = torch.max(torch.stack([a.grad.detach().data.norm(2) for a in grad_params]))
+            staleness = np.array(steps) - train_step
             wandb.log({
                 "loss": loss.item(),
                 "q_values_max": predicted_q_vals.max().item(),
                 "q_values_min": predicted_q_vals.min().item(),
                 "q_values_mean": predicted_q_vals.mean().item(),
-                "batch_reward_mean": r_t_1.mean().item(),
+                "batch_reward_mean": rewards.mean().item(),
                 "SPS": int(train_step / (time.time() - start_time)),
                 "grad_norm": grad_norm.item(),
-                "grad_max": grad_max.item()
+                "grad_max": grad_max.item(),
+                "staleness_mean": staleness.mean(),
+                "staleness_std": staleness.std(),
             }, step=train_step)
             
         if (train_step + 1) % config.target_update_freq == 0:
@@ -284,21 +273,33 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
                 dqn_agent.update_model(target_net, device=torch.device("cuda"))
 
             gc.collect()
-            torch.cuda.empty_cache() 
+            torch.cuda.empty_cache()
             
             val_env_rand.reset(seed=config.seed * 2)
             val_env_humanexe.reset(seed=config.seed * 2)
-            reward_rand = 0.1 * sum(val_env_rand.agent.run_episodes(config.seed, 10))
-            reward_humanexe = 0.1 * sum(val_env_humanexe.agent.run_episodes(config.seed, 10))
-            print("[INFO] Validation rewards: ", reward_rand, "--", reward_humanexe)
             
-            val_env_rand.write("val_rand_episode_" + str(train_step) + ".txt")
-            val_env_humanexe.write("val_humanexe_episode_" + str(train_step) + ".txt")
+            num_episodes = 2
+            
+            rewards_rand, lengths_rand = val_env_rand.agent.run_episodes(config.seed, num_episodes)
+            rewards_humanexe, lengths_humanexe = val_env_humanexe.agent.run_episodes(config.seed, num_episodes)
+            
+            mean_reward_rand = 1.0/num_episodes * sum(rewards_rand)
+            mean_reward_humanexe = 1.0/num_episodes * sum(rewards_humanexe)
+            
+            mean_length_rand = 1.0/num_episodes * sum(lengths_rand)
+            mean_length_humanexe = 1.0/num_episodes * sum(lengths_humanexe)
+            
+            print("[INFO] Validation rewards: ", mean_reward_rand, "--", mean_reward_humanexe)
+            
+            val_env_rand.write("resources/replays/val_rand_episode_" + str(train_step) + ".txt")
+            val_env_humanexe.write("resources/replays/val_humanexe_episode_" + str(train_step) + ".txt")
             
             if config.use_wandb:
                 wandb.log({
-                    "val_rewards_rand": reward_rand,
-                    "val_rewards_humanexe": reward_humanexe
+                    "val_rand_mean_reward_step": mean_reward_rand,
+                    "val_humanexe_mean_reward_step": mean_reward_humanexe,
+                    "val_rand_mean_length": mean_length_rand,
+                    "val_humanexe_mean_length": mean_length_humanexe
                     }, step=train_step)
             
     
@@ -327,6 +328,8 @@ if __name__ == "__main__":
     
     print("[DEBUG] Starting ray cluster...")    
     print("[DEBUG] Cluster resources: ", ray.cluster_resources())
+    sys.stdout.flush()
+    
     time.sleep(5)
     
     print("[DEBUG] Initializing buffer and target network params...")
@@ -339,6 +342,7 @@ if __name__ == "__main__":
     summary(tgt_net, (config.n_rows, config.n_cols, config.input_channels), device="cpu")
     del tgt_net
     
+    sys.stdout.flush()
     time.sleep(5)
     
 
@@ -347,21 +351,23 @@ if __name__ == "__main__":
     print("[INFO] Target network: ", list(ray.get(server.get_target_net.remote()).keys())[:5])
     
     configs = [copy.deepcopy(config) for _ in range(1000)]
-    for i, c in enumerate(configs):
-        c.seed = 2**((2*i+3) % 27) - 13 * i + 1 + (i+11)**2
+    for i in range(len(configs)):
+        configs[i].seed = abs(2**((2*i+3) % 27) - 13 * i + 1 + (i+11)**2)
     
     env_runners = []
     # env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 20)])
     # time.sleep(10)
     # env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 10)])
     # time.sleep(10)
-    env_runners.extend([EnvRunner.options(num_gpus=0.01).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.8, c.seed), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 25)])
-    time.sleep(10)
+    # env_runners.extend([EnvRunner.options(num_gpus=0.01).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.6, c.seed), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 25)])
+    # time.sleep(10)
     env_runners.extend([EnvRunner.options(num_gpus=0.01).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.8, c.seed + 2**7 - 1), opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 25)])
     time.sleep(10)
-    
+    env_runners.extend([EnvRunner.options(num_gpus=0.01).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.2, c.seed + 3**7 - 1), opponent=RandomAgent(1, 3 * (c.seed % 49) + c.seed), server=server, buffer=buffer) for c in random.sample(configs, 25)])
+    time.sleep(10)
+
     env_runners = [runner.run.remote() for runner in env_runners]
-    
+    sys.stdout.flush()
     # ray.wait(env_runners, num_returns=10)
     # ray.get(env_runners)
     

@@ -85,14 +85,9 @@ class GeneralsEnvironment(gym.Env):
         )
         self.game = game_master.GameMaster(board, [self.agent, self.opponent], logger=Logger())
         
-        return self.game.state.to_observation(self.agent.player_index), {}
+        return self.game.state.to_observation(self.agent.player_index, fog_of_war=False), {}
     
     def step(self, action: ActType) -> Tuple[ObsType, float, bool, bool, dict]:
-        '''
-        Execute an action and return the new state, reward, done flag, and additional info.
-        The behaviour of this function depends primarily on the dynamics of the underlying
-        environment.
-        '''
         self._prev_state = GameState(self.game.state.board, deepcopy(self.game.state.scores), self.game.state.turn, self.game.state.terminal_status)
         
         action_idx = action
@@ -104,13 +99,13 @@ class GeneralsEnvironment(gym.Env):
         reward += (1 - legal_move) * -1.0 # penalize illegal moves / invalid actions
         
         new_game_state = self.game.step()
-        new_obs = new_game_state.to_observation(self.agent.player_index)
+        new_obs = new_game_state.to_observation(self.agent.player_index, fog_of_war=False)
 
         terminated = self.game.state.board.terminal_status() > -1
         if terminated:
             agentWon = self.game.state.board.terminal_status() == self.agent.player_index
-            multiplier = 1.0 if agentWon else -1.0
-            reward += (multiplier * (0.1/(1.0 - self.agent.gamma)))
+            win_loss_reward = 10.0 if agentWon else -10.0
+            reward += win_loss_reward
             
         info = {"opponent": self.opponent, "legal_move": legal_move, "game_state": self.game.state, "prev_state": self._prev_state}
         

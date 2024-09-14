@@ -80,6 +80,7 @@ class GymAgent(AgentWrapper):
         self.reset(seed=seed)
         self.agent.reset(seed=seed)
         done = False
+        length = 0
         while not done:
             act = self.get_action(obs)
             self.set_action(act)
@@ -90,7 +91,8 @@ class GymAgent(AgentWrapper):
                 self.agent.observe(experience)
             rewards.append(reward)
             obs = new_obs
-        return float((np.array(rewards) * np.power(self.gamma, np.arange(len(rewards)))).sum())
+            length += 1
+        return float((np.array(rewards) * np.power(self.gamma, np.arange(len(rewards)))).sum()), length
     
     def run_episodes(self, seed, n_runs=500):
         '''
@@ -100,11 +102,13 @@ class GymAgent(AgentWrapper):
         Outputs:
             The discounted sum of rewards obtained for each episode
         '''
-        all_rewards = []
+        rewards = []
+        lengths = []
         powers = np.random.default_rng(seed).integers(2, 15, n_runs)
         offsets = np.random.default_rng(seed).integers(0, 32, n_runs)
         seeds = np.power(2, powers) + offsets
         for idx, seed in enumerate(seeds):
-            reward = self.run_episode(int(seed))
-            all_rewards.append(float(reward))
-        return all_rewards
+            reward, length = self.run_episode(int(seed))
+            rewards.append(float(reward))
+            lengths.append(length)
+        return rewards, lengths

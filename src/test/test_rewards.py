@@ -9,9 +9,6 @@ from src.environment.action import Action
 from src.environment.environment import GeneralsEnvironment
 import argparse
 
-
-
-
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser()

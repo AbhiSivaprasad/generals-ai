@@ -111,7 +111,7 @@ class Board:
         for i in range(self.num_rows):
             for j in range(self.num_cols):
                 for direction in Direction:
-                    action = Action(startx=i, starty=j, direction=direction)
+                    action = Action(startx=j, starty=i, direction=direction)
                     if self.is_action_valid(action, player_index):
                         valid_actions.append(action)
         return valid_actions
