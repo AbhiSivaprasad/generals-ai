@@ -48,7 +48,7 @@ def generate_candidate_board_state(
         min_ratio_of_generals_distance_to_board_side * min(num_rows, num_cols)
     )
 
-    board = Board(num_rows=num_rows, num_cols=num_cols, player_index=None)
+    board = Board(num_rows=num_rows, num_cols=num_cols)
     while True:
         p1_general_position = _random_position(num_rows, num_cols)
         p2_general_position = _random_position(num_rows, num_cols)

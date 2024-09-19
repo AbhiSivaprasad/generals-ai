@@ -5,8 +5,8 @@ from typing import List
 
 from src.environment.board import Board
 from src.environment.logger import Logger
-from src.environment.tile import Tile, TileType
-from src.environment.action import Action, convert_direction_to_vector
+from src.environment.tile import TileType
+from src.environment.action import Action
 
 
 class GameMaster:
@@ -14,13 +14,21 @@ class GameMaster:
     handles game state
     """
 
-    def __init__(self, board: Board, players, max_turns=None, logger: Logger = None):
+    def __init__(
+        self,
+        board: Board,
+        players,
+        max_turns=None,
+        normal_tile_increment_frequency: int = 50,
+        logger: Logger = None,
+    ):
         self.board = board
         self.board.player_index = None
         self.logger = logger
         self.players = players
         self.turn = 0
         self.max_turns = max_turns
+        self.normal_tile_increment_frequency = normal_tile_increment_frequency
 
         if self.logger is not None:
             # log initial board configuration
@@ -32,7 +40,7 @@ class GameMaster:
         :return: index of winning player or -1 if max turns reached
         """
         while self.board.terminal_status() == -1 and self.turn < self.max_turns:
-            actions = [player.move(self.board) for player in self.players]
+            actions = [player.move(self.board)[0] for player in self.players]
             self.step(actions)
 
         return self.board.terminal_status()
@@ -60,20 +68,20 @@ class GameMaster:
     def add_troops_to_board(self):
         """increment all troops on captured cities or generals"""
         # only increment troops on even turns
-        if self.turn % 2 == 1:
-            return
-
         for i in range(self.board.num_rows):
             for j in range(self.board.num_cols):
                 tile = self.board.grid[i][j]
 
                 # increment generals and captured cities every 2 turns
-                # increment player's land every 50 turns
-                if tile.type == TileType.GENERAL or (
+                if (tile.type == TileType.GENERAL and self.turn % 2 == 0) or (
                     tile.player_index is not None
                     and (
                         tile.type == TileType.CITY
-                        or (tile.type == TileType.NORMAL and self.turn % (25 * 2) == 0)
+                        and self.turn % 2 == 0
+                        or (
+                            tile.type == TileType.NORMAL
+                            and self.turn % self.normal_tile_increment_frequency == 0
+                        )
                     )
                 ):
                     tile.army += 1
@@ -96,8 +104,8 @@ class GameMaster:
             if dest_tile.army < start_tile.army - 1:
                 # attack is successful--destination cell is captured
                 old_dest_player_index = dest_tile.player_index
-                print('DEST TILE PLAYER INDEX', dest_tile.player_index)
                 dest_tile.player_index = start_tile.player_index
+                print('DEST TILE PLAYER INDEX IS NOW', dest_tile.player_index)
                 dest_tile.army = (start_tile.army - 1) - dest_tile.army
 
                 # update vision from captured tile

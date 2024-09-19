@@ -31,6 +31,44 @@ const patch = (board: BoardState, diffs: BoardDiff) => {
     }
 }
 
+render() {
+    return this.props.boardStates.length !== 0 && (
+        <>
+            <div>
+                <Board data={this.props.boardStates[this.state.time]} playerIndex={this.props.playerIndex} />
+                <PlayBar onAutoPlaySpeedClickFactory={this.onAutoPlaySpeedClickFactory}
+                    onPlayButtonClick={this.onPlayButtonClick}
+                    onPauseButtonClick={this.onPauseButtonClick}
+                    onLastMoveClick={this.onLastMoveClick}
+                    onNextMoveClick={this.onNextMoveClick} />
+                turn: {this.state.time}
+            </div>
+            <table>
+                <tbody>
+                    {
+                        this.props.infos.length > this.state.time &&
+                        Object.entries(this.props.infos[this.state.time]).map(([k, v]) => {
+                            return (
+                                <tr key={k}>
+                                    <td>{k}</td>
+                                    {
+                                        v.map(cell => {
+                                            return (
+                                                <td>
+                                                    {JSON.stringify(cell)}
+                                                </td>
+                                            )
+                                        })
+                                    }
+                                </tr>
+                            )
+                        })
+                    }
+                </tbody>
+            </table>
+        </>
+    )
+}
 
 const Replay: React.FC<ReplayProps> = ({ boardStates, playerIndex }) => {
     const [time, setTime] = useState(0);

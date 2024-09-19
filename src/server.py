@@ -1,11 +1,11 @@
 import asyncio
 from dataclasses import dataclass
 import logging
+import socket
 from typing import Optional
 from pathlib import Path
 from flask import Flask, jsonify, request, make_response
-from flask_cors import CORS
-from flask_socketio import SocketIO, send, emit, join_room, leave_room
+from flask_cors import CORS, cross_origin
 from flask_openapi3 import OpenAPI, Info, Tag
 
 
@@ -13,15 +13,12 @@ from flask_openapi3 import OpenAPI, Info, Tag
 import os
 
 from enum import Enum
+
+from flask_socketio import SocketIO
 from src.api_types import ErrorResponse, ReplayResponse
 from src.environment.action import Action, get_direction_from_str
 
-from src.live_game import LiveGame, LivePlayer
-
-class UserState(Enum):
-    IN_LOBBY = 1
-    IN_GAME = 2
-    IN_QUEUE = 3
+from src.live_game import LivePlayer, UserState, ConnectedUser, LiveGame
 
 __dirname__ = os.path.dirname(__file__)
 ROOT_DIR = Path(__dirname__).parent
@@ -35,18 +32,10 @@ api = OpenAPI(__name__, info=info)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.WARNING)  # or logging.CRITICAL to suppress more logs
 
-
-@dataclass
-class PlayerStatus:
-    status: UserState
-    socket_id: str
-    # If the user is actively in a game, the player is here.
-    live_game_player: Optional[LivePlayer]
-
 # high level, the server mantains two pices of state:
 
 # Mapping from socket id to the player
-connected_users: dict[str, PlayerStatus] = {}
+connected_users: dict[str, ConnectedUser] = {}
 
 # Mapping from game id to the LiveGame class
 active_games: dict[str, LiveGame] = {}
@@ -92,12 +81,16 @@ def join_game(game_id):
     return "joined game"
 
 @socketio.on('connect')
-def handle_connect(auth):
+def handle_connect():
     print("CONNECTED USERS ARE", connected_users.keys())
-    connected_users[request.sid] = PlayerStatus(status=UserState.IN_LOBBY, socket_id=request.sid, live_game_player=None)
+    connected_users[request.sid] = ConnectedUser(status=UserState.IN_LOBBY, username="Unnamed User", socket_id=request.sid, live_game_player=None)
+
+@socketio.on('set_username')
+def set_username(username):
+    connected_users[request.sid].username = username
 
 def consider_starting_game():
-    all_users_in_lobby = [user.socket_id for user in connected_users.values() if user.status == UserState.IN_QUEUE]
+    all_users_in_lobby = [user for user in connected_users.values() if user.status == UserState.IN_QUEUE]
     if len(all_users_in_lobby) >= 2:
         print("starting game because there are enough users")
         # start a game
@@ -112,18 +105,21 @@ def consider_starting_game():
         print("not enough users to start game")
 
 @socketio.on('join-game')
-def handle_join_game():
+def handle_join_game(data):
     print("joining game")
-    connected_users[request.sid].status = UserState.IN_QUEUE
-    consider_starting_game()
+    if data["playBot"] == True:
+    else:
+        connected_users[request.sid].status = UserState.IN_QUEUE
+        consider_starting_game()
 
 
 @socketio.on('disconnect')
-def handle_disconnect(auth):
+def handle_disconnect():
+    print("DISCONNECTED", request.sid, len(connected_users), "players left")
     if request.sid in connected_users:
         user = connected_users[request.sid]
         if user.status == UserState.IN_GAME and user.live_game_player:
-            # end the game
+            # disconnect the player. also potentially ends the game.
             user.live_game_player.handle_disconnect()
         del connected_users[request.sid]
 
@@ -136,6 +132,7 @@ def handle_move(data):
     if user.status != UserState.IN_GAME or not user.live_game_player:
         return
     # deserialize back into python format
+    # TDOO: coalesce this type between ts and python?
     actions = [Action(do_nothing=False, startx=action_dict['columnIndex'], starty=action_dict['rowIndex'], direction=get_direction_from_str(action_dict['direction'])) for action_dict in data]
     user.live_game_player.set_move_queue(actions)
 

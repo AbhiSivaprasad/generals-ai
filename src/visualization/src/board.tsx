@@ -1,12 +1,13 @@
 import React from 'react';
-import Row from "./row"
+import Row from './row';
 
 interface BoardProps {
     data: any[];
     playerIndex: number;
+    fogOfWarEnabled: boolean
 }
 
-const Board: React.FC<BoardProps> = ({ data, playerIndex }) => {
+const Board: React.FC<BoardProps> = ({ data, playerIndex, fogOfWarEnabled }) => {
     const tableStyle = {
         borderCollapse: "collapse",
         border: "1px solid black"
@@ -17,7 +18,7 @@ const Board: React.FC<BoardProps> = ({ data, playerIndex }) => {
             <tbody>
                 {
                     data.map((item, index) => (
-                        <Row data={item} key={index} playerIndex={playerIndex} />
+                        <Row fogOfWarEnabled={fogOfWarEnabled} data={item} key={index} playerIndex={playerIndex} />
                     ))
                 }
             </tbody>

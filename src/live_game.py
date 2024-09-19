@@ -1,9 +1,14 @@
 import asyncio
 from dataclasses import dataclass
+from enum import Enum
 from socket import SocketIO
+from typing import Optional
+from networkx import ExceededMaxIterations
 import socketio
 import uuid
 from flask_socketio import emit
+from src.agents import agent
+from src.agents.agent import Agent
 from src.environment import action, board
 from src.environment.board import Board
 
@@ -14,9 +19,9 @@ from src.environment.tile import Tile
 
 
 class LiveGame(GameMaster):
-    def __init__(self, player_sids: str):
+    def __init__(self, player_inits: list["ConnectedUser" | "BotSpec"]):
         self.board = generate_board_state(15, 15, mountain_probability=0.2, city_probability=0.03)
-        self.players = [LivePlayer(player_id, "test", self, player_index) for player_index, player_id in enumerate(player_sids)]
+        self.players = [HumanPlayer(player_init.socket_id, player_init.username, self, player_index) if isinstance(player_init, ConnectedUser) else BotPlayer(model_spec=player_init) for player_index, player_init in enumerate(player_inits)]
         self.game_id = uuid.uuid4()
         self.turn = 0
         super().__init__(self.board, self.players)
@@ -27,21 +32,23 @@ class LiveGame(GameMaster):
         for player in self.players:
             player.disseminate_board_state(self.board)
 
-    def disseminate_board_update(self, board_diff: list[Tile]):
+    def process_board_update(self, board_diff: list[Tile], board_state: list[list[Tile]]):
         for player in self.players:
-            player.disseminate_board_update(board_diff)
+            player.on_board_update(board_diff, board_state)
 
-    async def handle_disconnect_player(self, player_id):
+    def handle_disconnect_player(self, player_id):
+        print('player disconnected! disemminating', player_id)
         for player in self.players:
             if player.player_id != player_id:
-                emit('player_disconnected', {}, to=player.player_id)
+                emit('game_over', {"reason": "player_disconnected", "player_id": player_id}, to=player.player_id)
         self.is_playing = False
 
     async def start_game(self):
         self.is_playing = True
         for player in self.players:
             player.disseminate_game_start(self.board)
-        await self.play()
+        winning_player = await self.play()
+        emit('game_over', {"reason": "player_won", "player_id": self.players[winning_player].username})
 
     # We don't want to send the entire board state over the network every time,
     # so we compute the diff between the previous board state and the current board state
@@ -81,7 +88,7 @@ class LiveGame(GameMaster):
             for moving_player_index, player in list(enumerate(self.players)):
                 # get first valid action from player
                 while True:
-                    action = player.get_top_move()
+                    action = player.pop_top_move()
                     if action is None:
                         break
 
@@ -100,7 +107,10 @@ class LiveGame(GameMaster):
             self.add_troops_to_board()
             self.update_player_stats()
 
-            self.disseminate_board_update(self.get_board_diff(previous_board_serialized))
+            self.process_board_update(self.get_board_diff(previous_board_serialized), self.board)
+            for player in self.players:
+                if isinstance(player, BotSpec):
+
             await asyncio.sleep(0.5)
             self.turn += 1
 
@@ -108,6 +118,23 @@ class LiveGame(GameMaster):
 
 
 class LivePlayer():
+    def __init__(self):
+        self.move_queue = []
+    def pop_top_move(self):
+        return self.move_queue.pop(0) if self.move_queue else None
+    def on_board_update(self, board: list[list[Tile]], board_diff: list[Tile]):
+        # Subclasses must implement this
+        raise NotImplementedError
+
+
+class BotPlayer(LivePlayer):
+    def __init__(self, agent: Agent):
+        self.agent = agent
+        super()
+
+    def on_board_update(self, board: list[list[Tile]], board_diff: list[Tile]):
+        self.move_queue = self.agent.move(board)
+class HumanPlayer(LivePlayer):
     # todo: separate player id from socket id?
     def __init__(self, player_id: str, username: str, live_game: LiveGame, player_index: int):
         self.player_id = player_id
@@ -117,7 +144,7 @@ class LivePlayer():
         self.land_count = 0
         self.army_count = 0
         self.game_state = {}
-        self.move_queue = []
+        super()
     def set_move_queue(self, move_queue: list[action.Action]):
         print('setting player move queue', move_queue)
         self.move_queue = move_queue
@@ -126,9 +153,9 @@ class LivePlayer():
         self.game.handle_disconnect_player(self.player_id)
 
     def disseminate_game_start(self, board: Board):
-        emit('game_start', {'board_state': board.serialize()}, to=self.player_id)
+        emit('game_start', {'board_state': board.serialize(), 'player_index': self.player_index}, to=self.player_id)
 
-    def disseminate_board_update(self, board_diff: list[Tile]):
+    def on_board_update(self, board_diff: list[Tile]):
         # Todo: don't do this for each player.
         emit('board_update', {'board_diff': [tile.serialize() for tile in board_diff], 'move_queue': [action.serialize() for action in self.move_queue]}, to=self.player_id)
         
@@ -136,5 +163,23 @@ class LivePlayer():
     def disseminate_game_over(self, winner_player_id):
         emit('game_over', {'winning_player': winner_player_id})
 
-    def get_top_move(self) -> action.Action:
-        return self.move_queue.pop(0) if self.move_queue else None
+
+
+class UserState(Enum):
+    IN_LOBBY = 1
+    IN_GAME = 2
+    IN_QUEUE = 3
+
+
+
+@dataclass
+class BotSpec:
+    model: str
+
+@dataclass
+class ConnectedUser:
+    status: UserState
+    socket_id: str
+    username: str
+    # If the user is actively in a game, the player is here.
+    live_game_player: Optional[LivePlayer]

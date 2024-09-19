@@ -33,9 +33,6 @@ class DQN(nn.Module):
         self.hidden_layers = self._conv_block(
             input_channels, n_hidden_conv_channels, kernel_size, hidden_conv_padding
         )
-        # first conv layer may change input size
-        n_output_columns = n_columns + 2 * hidden_conv_padding - kernel_size + 1
-        n_output_rows = n_rows + 2 * hidden_conv_padding - kernel_size + 1
 
         # hidden conv layers, input size stays the same
         for _ in range(n_hidden_conv_layers):
@@ -57,7 +54,7 @@ class DQN(nn.Module):
         # fully connected layer to predict over actions
         self.output_head = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(n_output_rows * n_output_columns, n_actions),
+            nn.Linear(n_rows * n_columns, n_actions),
         )
 
     def forward(self, x):

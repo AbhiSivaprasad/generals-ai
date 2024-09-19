@@ -28,6 +28,7 @@ class GeneralsEnvironment(ParallelEnv):
         city_probability: float = 0.0,
         use_fog_of_war: bool = False,
         auxiliary_reward_weight: float = 0.01,
+        normal_tile_increment_frequency: int = 50,
     ):
         self.agents = agents
         self.max_turns = max_turns
@@ -38,6 +39,7 @@ class GeneralsEnvironment(ParallelEnv):
         self.use_fog_of_war = use_fog_of_war
         self.n_step = 0
         self.auxiliary_reward_weight = auxiliary_reward_weight
+        self.normal_tile_increment_frequency = normal_tile_increment_frequency
 
         # Define action and observation spaces
         self.action_spaces = {
@@ -71,6 +73,7 @@ class GeneralsEnvironment(ParallelEnv):
             players=self.agents,
             logger=logger,
             max_turns=self.max_turns,
+            normal_tile_increment_frequency=self.normal_tile_increment_frequency,
         )
         self.previous_agent_scores = {
             agent_index: 0 for agent_index in range(len(self.agents))
@@ -84,27 +87,37 @@ class GeneralsEnvironment(ParallelEnv):
         infos = {agent_index: {} for agent_index in range(len(self.agents))}
         return observations, infos
 
-    def step(self, actions):
-        # Convert actions to the format expected by game_master
+    def step(self, actions, action_infos=None):
+        pre_action_observation = self._get_observations()
+        self.action_infos = action_infos
+
+        # convert actions to the format expected by game_master
         game_actions = [
             Action.from_index(actions[agent_index], self.board_x_size)
             for agent_index in range(len(self.agents))
         ]
 
-        # Execute one tick of the game
-        self.game_master.step(game_actions)
-        self.n_step += 1
+        # save wehther moves were legal before the board is updated
+        self.are_agent_actions_legal = self.check_agent_actions_legal(game_actions)
 
+        # execute one tick of the game
+        self.game_master.step(game_actions)
+
+        # new environment information
         observations = self._get_observations()
         rewards = self._get_rewards()
         terminations = self._get_terminations()
         truncations = self._get_truncations()
-        infos = self._get_infos(game_actions)
+        infos = self._get_infos()
+
+        self._log(pre_action_observation, rewards, actions, game_actions, infos)
+        self.n_step += 1
+
         return observations, rewards, terminations, truncations, infos
 
     def _get_observations(self):
         observation = convert_state_to_array(
-            self.game_master.board,
+            self.game_master,
             len(self.agents),
             fog_of_war=self.use_fog_of_war,
         )
@@ -114,31 +127,22 @@ class GeneralsEnvironment(ParallelEnv):
         }
 
     def _get_rewards(self):
-        # reward component 1: change in difference between agent's score and other agent's score
+        # reward component 1a: change in difference between agent's score and other agent's score
+        # reward component 1b: whether action was legal
         # reward component 2: win/loss
-        # final reward is component 2 + 0.01 * component 1
-        agent_scores = {
-            agent_index: self.game_master.board.get_player_score(agent_index)
-            for agent_index in range(len(self.agents))
-        }
-        agent_score_changes = {
-            agent_index: agent_scores[agent_index]
-            - self.previous_agent_scores[agent_index]
-            for agent_index in range(len(self.agents))
-        }
-        total_agent_score_changes = sum(agent_score_changes.values())
-        auxiliary_rewards = {
-            agent_index: 2 * agent_score_change - total_agent_score_changes
-            for agent_index, agent_score_change in agent_score_changes.items()
-        }
-
+        # final reward is component 2 + constant * component 1
+        auxiliary_land_rewards = self.get_auxiliary_land_reward()
+        auxiliary_legal_move_rewards = self.get_auxiliary_legal_move_reward()
         main_rewards = self.get_main_rewards()
         total_rewards = {
             agent_index: main_rewards[agent_index]
-            + self.auxiliary_reward_weight * auxiliary_rewards[agent_index]
+            + self.auxiliary_reward_weight
+            * (
+                auxiliary_land_rewards[agent_index]
+                + auxiliary_legal_move_rewards[agent_index]
+            )
             for agent_index in range(len(self.agents))
         }
-        self.previous_agent_scores = agent_scores
         return total_rewards
 
     def get_main_rewards(self):
@@ -153,6 +157,35 @@ class GeneralsEnvironment(ParallelEnv):
                 )
         return main_rewards
 
+    def check_agent_actions_legal(self, game_actions: List[Action]):
+        return {
+            i: self.game_master.board.is_action_valid(action=action, player_index=i)
+            for i, action in enumerate(game_actions)
+        }
+
+    def get_auxiliary_legal_move_reward(self):
+        return {
+            i: int(is_legal) for i, is_legal in self.are_agent_actions_legal.items()
+        }
+
+    def get_auxiliary_land_reward(self):
+        agent_scores = {
+            agent_index: self.game_master.board.get_player_score(agent_index)
+            for agent_index in range(len(self.agents))
+        }
+        agent_score_changes = {
+            agent_index: agent_scores[agent_index]
+            - self.previous_agent_scores[agent_index]
+            for agent_index in range(len(self.agents))
+        }
+        total_agent_score_changes = sum(agent_score_changes.values())
+        auxiliary_rewards = {
+            agent_index: 2 * agent_score_change - total_agent_score_changes
+            for agent_index, agent_score_change in agent_score_changes.items()
+        }
+        self.previous_agent_scores = agent_scores
+        return auxiliary_rewards
+
     def _get_terminations(self):
         game_over = self.game_master.board.terminal_status() != -1
         return {agent_index: game_over for agent_index in range(len(self.agents))}
@@ -161,22 +194,40 @@ class GeneralsEnvironment(ParallelEnv):
         truncated = self.n_step >= self.max_turns
         return {agent_index: truncated for agent_index in range(len(self.agents))}
 
-    def _get_infos(self, game_actions):
-        are_game_actions_legal = {
-            agent_index: self.game_master.board.is_action_valid(
-                game_actions[agent_index], agent_index
-            )
+    def _get_infos(self):
+        merged_info_for_agent = lambda agent_index: (
+            self.action_infos[agent_index] if self.action_infos is not None else {}
+        )
+        return {
+            agent_index: merged_info_for_agent(agent_index)
             for agent_index in range(len(self.agents))
         }
-        infos = self._merge_info_dicts(is_game_action_legal=are_game_actions_legal)
-        return infos
 
-    def _merge_info_dicts(self, **info_dicts):
-        infos = defaultdict(dict)
-        for info_type, info_dict in info_dicts.items():
-            for agent_index, info in info_dict.items():
-                infos[agent_index][info_type] = info
-        return infos
+    def _log(self, pre_action_observation, rewards, actions, game_actions, infos):
+        player_dict_to_list = lambda player_dict: [
+            player_dict[agent_index] for agent_index in range(len(self.agents))
+        ]
+        # when serializing observations, serialize them channels-last instead of channels-first i.e. (C, H, W) -> (H, W, C)
+        self.game_master.logger.log_info(
+            "obs_tensor",
+            [
+                a.transpose(1, 2, 0).tolist()
+                for a in player_dict_to_list(pre_action_observation)
+            ],
+            self.n_step,
+        )
+        self.game_master.logger.log_info(
+            "rewards", player_dict_to_list(rewards), self.n_step
+        )
+        self.game_master.logger.log_info(
+            "action_indices", player_dict_to_list(actions), self.n_step
+        )
+        self.game_master.logger.log_info(
+            "actions", [vars(a) for a in game_actions], self.n_step
+        )
+        self.game_master.logger.log_info(
+            "agent_infos", player_dict_to_list(infos), self.n_step
+        )
 
     def render(self):
         pass
