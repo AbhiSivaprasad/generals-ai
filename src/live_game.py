@@ -32,9 +32,10 @@ class LiveGame(GameMaster):
         for player in self.players:
             player.disseminate_board_state(self.board)
 
-    def process_board_update(self, board_diff: list[Tile], board_state: list[list[Tile]]):
+    def process_board_update(self, previous_board_serialized):
+        diff = self.get_board_diff(previous_board_serialized), self.board
         for player in self.players:
-            player.on_board_update(board_diff, board_state)
+            player.on_board_update(self.board, diff)
 
     def handle_disconnect_player(self, player_id):
         print('player disconnected! disemminating', player_id)
@@ -107,9 +108,8 @@ class LiveGame(GameMaster):
             self.add_troops_to_board()
             self.update_player_stats()
 
-            self.process_board_update(self.get_board_diff(previous_board_serialized), self.board)
-            for player in self.players:
-                if isinstance(player, BotSpec):
+            self.process_board_update(previous_board_serialized)
+                
 
             await asyncio.sleep(0.5)
             self.turn += 1
@@ -120,20 +120,22 @@ class LiveGame(GameMaster):
 class LivePlayer():
     def __init__(self):
         self.move_queue = []
+    def disseminate_game_start(self, board: Board):
+        pass
+    def disseminate_game_voer(self, winner_player_id):
+        pass
     def pop_top_move(self):
         return self.move_queue.pop(0) if self.move_queue else None
     def on_board_update(self, board: list[list[Tile]], board_diff: list[Tile]):
         # Subclasses must implement this
         raise NotImplementedError
-
-
 class BotPlayer(LivePlayer):
     def __init__(self, agent: Agent):
         self.agent = agent
         super()
 
     def on_board_update(self, board: list[list[Tile]], board_diff: list[Tile]):
-        self.move_queue = self.agent.move(board)
+        self.move_queue = [self.agent.move(board)[0]]
 class HumanPlayer(LivePlayer):
     # todo: separate player id from socket id?
     def __init__(self, player_id: str, username: str, live_game: LiveGame, player_index: int):
@@ -155,7 +157,8 @@ class HumanPlayer(LivePlayer):
     def disseminate_game_start(self, board: Board):
         emit('game_start', {'board_state': board.serialize(), 'player_index': self.player_index}, to=self.player_id)
 
-    def on_board_update(self, board_diff: list[Tile]):
+    # Only send to the player the diff
+    def on_board_update(self, board: list[list[Tile]], board_diff: list[Tile]):
         # Todo: don't do this for each player.
         emit('board_update', {'board_diff': [tile.serialize() for tile in board_diff], 'move_queue': [action.serialize() for action in self.move_queue]}, to=self.player_id)
         
