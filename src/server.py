@@ -93,16 +93,13 @@ def handle_connect():
 def set_username(username):
     connected_users[request.sid].username = username
 
+# TODO: Enable more strict matchmaking based on skill levels.
 def consider_starting_game():
     all_users_in_lobby = [user for user in connected_users.values() if user.status == UserState.IN_QUEUE]
     if len(all_users_in_lobby) >= 2:
-        print("starting game because there are enough users")
+        print("2 queued users in lobby. Starting game between", all_users_in_lobby[0].username, "and", all_users_in_lobby[1].username)
         # start a game
         new_game = LiveGame(all_users_in_lobby)
-        # keep a direct mapping from socket id to live player
-        for player in new_game.players:
-            connected_users[player.player_id].live_game_player = player
-            connected_users[player.player_id].status = UserState.IN_GAME
         asyncio.run(new_game.start_game())
         active_games[new_game.game_id] = new_game
     else:
@@ -115,7 +112,8 @@ def handle_join_game(data):
             connected_users[request.sid].status = UserState.IN_QUEUE
             consider_starting_game()
         case "random":
-            new_game = LiveGame([connected_users[request.sid], BotPlayer(RandomAgent(1, 5))])
+            print('Starting game between user', request.sid, 'and bot')
+            new_game = LiveGame([connected_users[request.sid], BotPlayer(1, RandomAgent(1, 5))])
             asyncio.run(new_game.start_game())
         case _:
             raise ValueError(f"Invalid bot type: {data.get('opponentType')}")

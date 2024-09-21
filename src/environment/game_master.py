@@ -17,7 +17,7 @@ class GameMaster:
     max_turns: Optional[int]
     logger: Optional[Logger]
 
-    def __init__(self, board: Board, players: List[Agent], max_turns=None, logger:Logger=None, normal_tile_increment_frequency: int = 50):
+    def __init__(self, board: Board, players: List[Agent] = [], max_turns=None, logger:Logger=None, normal_tile_increment_frequency: int = 50):
         self.logger = logger
         self.players = players
         self.state = GameState(board, [0] * len(players), 0)
@@ -54,7 +54,7 @@ class GameMaster:
         conduct game between players on given board
         :return: index of winning player or -1 if max turns reached
         """
-        assert len(self.players) == 2 and self.players[0] is not None and self.players[1] is not None, "Game must have 2 players."
+        assert self.players is not None and len(self.players) == 2 and self.players[0] is not None and self.players[1] is not None, "Game must have 2 players. Did you forget to override the play function for a live game?"
         while self.state.board.terminal_status() == -1 and (self.max_turns is None or self.state.turn < self.max_turns):
             self.step()
         return self.state.board.terminal_status()

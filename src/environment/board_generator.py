@@ -79,7 +79,7 @@ def generate_candidate_board_state(
                 board.generals[1] = tile
             elif rng.random() < city_probability:
                 tile.type = TileType.CITY
-                tile.army = _random_city_size()
+                tile.army = _random_city_size(None)
                 board.cities.append(tile)
             elif rng.random() < mountain_probability:
                 tile.type = TileType.MOUNTAIN

@@ -26,6 +26,3 @@ class RandomAgent(Agent):
             action = Action(do_nothing=True).to_index(env.unwrapped.board_x_size)
         info = {"best_action": action}
         return action, info
-
-    def reset(self, seed=None):
-        pass

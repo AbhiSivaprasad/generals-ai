@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Board from '../../components/board';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import socket, { BoardStateMessage, BoardUpdateMessage } from '../../socketio/client';
 import { coalesceMoveQueues, patch } from '../../utils/board';
 import { Action, CellState, serverActionToAction } from '../types/globals';
@@ -22,6 +22,7 @@ type GameState = GamePlayingState | GameOverState
 
 const GamePage: React.FC = () => {
     const searchParams = useSearchParams();  // Extract the dynamic route parameter
+    const router = useRouter();
     const [moveQueue, setMoveQueue] = useState<Action[]>([]);
     const [board, setBoard] = useState<CellState[][] | null>(null);
     // The index of the player in the game
@@ -159,7 +160,6 @@ const GamePage: React.FC = () => {
         socket.emit('join-game', { opponentType });
         socket.on('game_start', (board_state: BoardStateMessage) => {
             // Save the board state to local storage
-            localStorage.setItem('board_state', JSON.stringify(board_state));
             setBoard(board_state.board_state);
             setPlayerIndex(board_state.player_index)
             console.log("adding keypress listener")
@@ -212,12 +212,17 @@ const GamePage: React.FC = () => {
     }
 
 
+
+
     return (
         <div className="overflow-hidden">
-            <h1>Game Page ({id})</h1>
+            <div>Playing Game</div>
             <div>
                 Fog of war
                 <input type="checkbox" checked={fogOfWarEnabled} onChange={(e) => setFogOfWarEnabled(e.target.checked)} />
+            </div>
+            <div>
+                <Button onClick={() => router.push('/')}>Back to Main Menu</Button>
             </div>
             {gameState.isOver && <Modal><div className='flex flex-col space-y-4 items-center'><div>Game over</div><div>{"You " + (gameState.userIsWinner ? "won!" : " lost :(")}</div><Button onClick={() => window.location.reload()}>Play Again</Button></div></Modal>}
 
