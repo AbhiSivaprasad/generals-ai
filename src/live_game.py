@@ -38,7 +38,6 @@ class LiveGame(GameMaster):
             player.on_board_update(self.board, diff)
 
     def handle_disconnect_player(self, player_id):
-        print('player disconnected! disemminating', player_id)
         for player in self.players:
             if player.player_id != player_id:
                 emit('game_over', {"reason": "player_disconnected", "player_id": player_id}, to=player.player_id)
@@ -79,6 +78,7 @@ class LiveGame(GameMaster):
     async def play(self):
         """
         conduct game between players on given board
+        players can be humans or bots, they both ascribe to the same interface
         :return: index of winning player or -1 if max turns reached
         """
         await asyncio.sleep(0.5)
@@ -94,7 +94,6 @@ class LiveGame(GameMaster):
                         break
 
                     # check for validity of action
-                    print('checking action', action, moving_player_index, self.board.is_action_valid(action, moving_player_index))
                     if self.board.is_action_valid(action, moving_player_index):
                         break
 
@@ -120,8 +119,8 @@ class LiveGame(GameMaster):
 class LivePlayer():
     def __init__(self):
         self.move_queue = []
-    def disseminate_game_start(self, board: Board):
-        pass
+    def disseminate_game_start(self, board: Brd):
+        pas
     def disseminate_game_voer(self, winner_player_id):
         pass
     def pop_top_move(self):
