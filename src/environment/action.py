@@ -27,6 +27,7 @@ class Action:
     startx: int
     starty: int
     direction: Direction
+    do_nothing: bool = False
     
     @classmethod
     def to_space_sample(cls, action: Optional["Action"], num_rows: int, num_col: int) -> int:

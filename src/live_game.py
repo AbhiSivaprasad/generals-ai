@@ -33,14 +33,15 @@ class LiveGame(GameMaster):
         if board_init is None:
             board_init = generate_board_state(15, 15, mountain_probability=0.2, city_probability=0.03)
         self.live_players = []
-        self.live_players = [self.create_player(init, idx, self) for idx, init in enumerate(player_inits)]
+        self.live_players = [self.create_live_player(init, idx, self) for idx, init in enumerate(player_inits)]
         self.game_id = uuid.uuid4()
         self.turn = 0
         super().__init__(board_init)
     
-    def create_player(self, player_init, player_index, game):
+    def create_live_player(self, player_init, player_index, game):
         if isinstance(player_init, ConnectedUser):
             player_init.live_game_player = HumanPlayer(player_init.socket_id, player_init.username, game, player_index)
+            player_init.status = UserState.IN_GAME
             return player_init.live_game_player
         else:
             return BotPlayer(player_index, player_init.agent)
@@ -106,6 +107,7 @@ class LiveGame(GameMaster):
             player.disseminate_game_start(self.state.board)
         await asyncio.sleep(0.5)
         while self.state.board.terminal_status() == -1 and (self.max_turns is None or self.turn < self.max_turns) and self.is_playing:
+            print('self turn is', self.turn)
             # serialize the board so that we can send the diff
             previous_board_serialized = self.state.board.serialize()
             # each player outputs a move given their view
@@ -167,6 +169,7 @@ class HumanPlayer(LivePlayer):
         self.game_state = {}
         super().__init__(player_index)
     def set_move_queue(self, move_queue: list[action.Action]):
+        print('SETTING MOVE QUEUE')
         self.move_queue = move_queue
 
     def handle_disconnect(self):

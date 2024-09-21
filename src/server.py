@@ -112,7 +112,7 @@ def handle_join_game(data):
             connected_users[request.sid].status = UserState.IN_QUEUE
             consider_starting_game()
         case "random":
-            print('Starting game between user', request.sid, 'and bot')
+            print('Starting game between user', request.sid, 'and bot', connected_users[request.sid])
             new_game = LiveGame([connected_users[request.sid], BotPlayer(1, RandomAgent(1, 5))])
             asyncio.run(new_game.start_game())
         case _:
@@ -133,13 +133,19 @@ def handle_disconnect():
 @socketio.on('set_move_queue')
 def handle_move(data):
     if request.sid not in connected_users:
+        print(f'user {request.sid} not in connected users. Returning early')
         return
     user = connected_users[request.sid]
-    if user.status != UserState.IN_GAME or not user.live_game_player:
+    if user.status != UserState.IN_GAME:
+        print(f'user {request.sid} not in game. Returning early')
+        return
+    if not user.live_game_player:
+        print(f'user {request.sid} has no associated live player. Returning early')
         return
     # deserialize back into python format
     # TDOO: coalesce this type between ts and python?
     actions = [Action(do_nothing=False, startx=action_dict['columnIndex'], starty=action_dict['rowIndex'], direction=get_direction_from_str(action_dict['direction'])) for action_dict in data]
+    print('setting move queue for game player', user.live_game_player)
     user.live_game_player.set_move_queue(actions)
 
 
