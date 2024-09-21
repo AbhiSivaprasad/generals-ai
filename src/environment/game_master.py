@@ -77,7 +77,7 @@ class GameMaster:
 
         # game logic to add troops to generals, cities, and land on specific ticks
         self.add_troops_to_board()
-        self.turn += 1
+        self.state.turn += 1
 
     def add_troops_to_board(self):
         """increment all troops on captured cities or generals"""

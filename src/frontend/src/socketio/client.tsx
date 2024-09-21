@@ -1,5 +1,5 @@
 import { io, Socket } from "socket.io-client";
-import { Action, BoardDiff, BoardState } from "../app/types/globals";
+import { Action, BoardDiff, BoardState, ServerAction } from "../app/types/globals";
 
 export interface BoardStateMessage {
     board_state: BoardState;
@@ -10,6 +10,7 @@ export interface BoardStateMessage {
 export interface BoardUpdateMessage {
     board_diff: BoardDiff;
     move_queue: ServerAction[];
+    server_consumed_moves: number;
 }
 
 // TODO: Should this type be less hacky?

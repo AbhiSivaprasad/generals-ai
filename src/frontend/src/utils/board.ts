@@ -50,11 +50,21 @@ export const coalesceMoveQueues = (
 
   let consumedIndex = 0;
   while (
-    consumedIndex < newMoveQueue.length &&
+    consumedIndex < moveQueue.length &&
     !isSameMove(moveQueue[consumedIndex], newMoveQueue[0])
   ) {
     consumedIndex++;
   }
+
+  console.log(
+    "coalescing move quuese of lenghts",
+    moveQueue.length,
+    newMoveQueue.length,
+    JSON.stringify(moveQueue),
+    JSON.stringify(newMoveQueue),
+    "consumed",
+    consumedIndex
+  );
 
   return moveQueue.slice(consumedIndex);
 };

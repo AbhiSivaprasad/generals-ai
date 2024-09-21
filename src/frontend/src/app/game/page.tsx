@@ -32,15 +32,14 @@ const GamePage: React.FC = () => {
     const [boardPosition, setBoardPosition] = useState({ offsetX: 200, offsetY: 200, zoom: 1 });
     const [selectedCell, setSelectedCell] = useState<[number, number] | null>(null);
 
+    // The server will send back the number of moves it has consumed,
+    // but if the user has already reset the queue these moves should not be consumed.
+    const hasQueueBeenResetSinceLastServerUpdate = useRef(false);
+
     const selectedCellRef = useRef<[number, number] | null>(null);
     useEffect(() => {
         selectedCellRef.current = selectedCell;
     }, [selectedCell]);
-
-
-    useEffect(() => {
-        console.log('board is', board)
-    }, [board])
 
     // Add a listener for the move queue
     const keyPressHandlerFactory = (boardRows: number, boardCols: number) => (event: KeyboardEvent) => {
@@ -105,21 +104,23 @@ const GamePage: React.FC = () => {
             }
         }
         if (event.key === 'q') {
+            hasQueueBeenResetSinceLastServerUpdate.current = true;
             setSelectedCell(null);
             setMoveQueue([]);
             socket.emit('set_move_queue', []);
         }
-        console.log(event.key)
         if (event.key === 'Escape' || event.key === ' ') {
             setSelectedCell(null);
         }
         if (event.key === 'e') {
-            const lastMove = moveQueue[moveQueue.length - 1];
-            if (!lastMove) {
-                return;
-            }
-            setSelectedCell([lastMove.rowIndex, lastMove.columnIndex]);
             setMoveQueue((currentMoveQueue) => {
+                const lastMove = currentMoveQueue[currentMoveQueue.length - 1];
+                console.log("last move", lastMove);
+                if (!lastMove) {
+                    console.log("no last move")
+                    return currentMoveQueue;
+                }
+                setSelectedCell([lastMove.rowIndex, lastMove.columnIndex]);
                 const newMoveQueue = currentMoveQueue.slice(0, -1);
                 socket.emit('set_move_queue', newMoveQueue);
                 return newMoveQueue;
@@ -176,6 +177,7 @@ const GamePage: React.FC = () => {
         })
 
         socket.on('board_update', (board_update: BoardUpdateMessage) => {
+            hasQueueBeenResetSinceLastServerUpdate.current = false;
             setBoard((currentBoard) => {
                 if (!currentBoard) {
                     return currentBoard;
@@ -186,7 +188,7 @@ const GamePage: React.FC = () => {
             });
             // TODO: Unify the client and server move queue types
             setMoveQueue((moveQueue) => {
-                return coalesceMoveQueues(moveQueue, board_update.move_queue.map(serverActionToAction));
+                return hasQueueBeenResetSinceLastServerUpdate.current ? moveQueue : moveQueue.slice(board_update.server_consumed_moves);
             });
         });
 

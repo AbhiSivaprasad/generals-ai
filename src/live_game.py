@@ -35,7 +35,6 @@ class LiveGame(GameMaster):
         self.live_players = []
         self.live_players = [self.create_live_player(init, idx, self) for idx, init in enumerate(player_inits)]
         self.game_id = uuid.uuid4()
-        self.turn = 0
         super().__init__(board_init)
     
     def create_live_player(self, player_init, player_index, game):
@@ -67,7 +66,7 @@ class LiveGame(GameMaster):
 
     async def start_game(self):
         winning_player = await self.play()
-        emit('game_over', {"reason": "player_won", "player_id": self.players[winning_player].username})
+        emit('game_over', {"reason": "player_won", "player_id": self.live_players[winning_player].username})
 
     # We don't want to send the entire board state over the network every time,
     # so we compute the diff between the previous board state and the current board state
@@ -106,8 +105,8 @@ class LiveGame(GameMaster):
         for player in self.live_players:
             player.disseminate_game_start(self.state.board)
         await asyncio.sleep(0.5)
-        while self.state.board.terminal_status() == -1 and (self.max_turns is None or self.turn < self.max_turns) and self.is_playing:
-            print('self turn is', self.turn)
+        while self.state.board.terminal_status() == -1 and (self.max_turns is None or self.state.turn < self.max_turns) and self.is_playing:
+            print('self turn is', self.state.turn)
             # serialize the board so that we can send the diff
             previous_board_serialized = self.state.board.serialize()
             # each player outputs a move given their view
@@ -136,9 +135,9 @@ class LiveGame(GameMaster):
                 
 
             await asyncio.sleep(0.5)
-            self.turn += 1
+            self.state.turn += 1
 
-        if self.turn >= self.max_turns:
+        if self.max_turns is not None and self.state.turn >= self.max_turns:
             return -1
         return self.state.board.terminal_status()
 
@@ -165,6 +164,8 @@ class HumanPlayer(LivePlayer):
         self.username = username
         self.game = live_game
         self.land_count = 0
+        # Moves consumer by the server.
+        self.server_consumed_moves = 0
         self.army_count = 0
         self.game_state = {}
         super().__init__(player_index)
@@ -178,10 +179,15 @@ class HumanPlayer(LivePlayer):
     def disseminate_game_start(self, board: Board):
         emit('game_start', {'board_state': board.serialize(), 'player_index': self.player_index}, to=self.player_id)
 
+    def pop_top_move(self):
+        self.server_consumed_moves += 1
+        return super().pop_top_move()
+
     # Only send to the player the diff
     async def on_board_update(self, game_state: GameState, board_diff: list[Tile]):
         # Todo: don't do this for each player.
-        emit('board_update', {'board_diff': [tile.serialize() for tile in board_diff], 'move_queue': [action.serialize() for action in self.move_queue]}, to=self.player_id)
+        emit('board_update', {'board_diff': [tile.serialize() for tile in board_diff], 'server_consumed_moves': self.server_consumed_moves, 'move_queue': [action.serialize() for action in self.move_queue]}, to=self.player_id)
+        self.server_consumed_moves = 0
         
     
     def disseminate_game_over(self, winner_player_id):
