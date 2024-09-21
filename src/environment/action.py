@@ -46,6 +46,15 @@ class Action:
         direction = Direction(dir)
         return cls(x, y, direction)
 
+    
+    def serialize(self) -> dict:
+        return {
+            'do_nothing': self.do_nothing,
+            'startx': self.startx,
+            'starty': self.starty,
+            'direction': self.direction.name if self.direction else None
+        }
+
 
 def convert_direction_to_vector(direction: Direction) -> Tuple[int, int]:
     if direction == Direction.UP:
