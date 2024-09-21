@@ -39,13 +39,12 @@ const App: React.FC = () => {
 
     const handlePlayAgainstBot = () => {
         // TODO: Implement play against bot functionality
-        router.push('/game');
+        router.push(`/game?opponentType=random`);
     };
 
     const handlePlayAgainstPlayer = () => {
         // TODO: Implement play against player functionality
-        console.log('Play against player clicked');
-
+        router.push(`/game?opponentType=human`);
     };
 
     const saveUsername = () => {

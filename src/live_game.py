@@ -2,7 +2,7 @@ import asyncio
 from dataclasses import dataclass
 from enum import Enum
 from socket import SocketIO
-from typing import Optional
+from typing import Optional, Union
 from networkx import ExceededMaxIterations
 import socketio
 import uuid
@@ -19,9 +19,9 @@ from src.environment.tile import Tile
 
 
 class LiveGame(GameMaster):
-    def __init__(self, player_inits: list["ConnectedUser" | "BotSpec"]):
+    def __init__(self, player_inits: list[Union["ConnectedUser", "BotSpec"]]):
         self.board = generate_board_state(15, 15, mountain_probability=0.2, city_probability=0.03)
-        self.players = [HumanPlayer(player_init.socket_id, player_init.username, self, player_index) if isinstance(player_init, ConnectedUser) else BotPlayer(model_spec=player_init) for player_index, player_init in enumerate(player_inits)]
+        self.players = [HumanPlayer(player_init.socket_id, player_init.username, self, player_index) if isinstance(player_init, ConnectedUser) else BotPlayer(player_init.agent) for player_index, player_init in enumerate(player_inits)]
         self.game_id = uuid.uuid4()
         self.turn = 0
         super().__init__(self.board, self.players)
@@ -34,8 +34,9 @@ class LiveGame(GameMaster):
 
     def process_board_update(self, previous_board_serialized):
         diff = self.get_board_diff(previous_board_serialized), self.board
+        # We kick off the update tasks here so that we don't block the game thread.
         for player in self.players:
-            player.on_board_update(self.board, diff)
+            asyncio.create_task(player.on_board_update(self.board, diff))
 
     def handle_disconnect_player(self, player_id):
         for player in self.players:
@@ -53,6 +54,8 @@ class LiveGame(GameMaster):
     # We don't want to send the entire board state over the network every time,
     # so we compute the diff between the previous board state and the current board state
     # and send the diff over the network.
+    # TODO: Coalesce this logic with the more efficient logic used to log update
+    # tiles in GameMaster.
     def get_board_diff(self, previous_board_serialized: dict):
         tiles_changed = []
         for y in range(self.board.num_rows):
@@ -113,6 +116,8 @@ class LiveGame(GameMaster):
             await asyncio.sleep(0.5)
             self.turn += 1
 
+        if self.turn >= self.max_turns:
+            return -1
         return self.board.terminal_status()
 
 
@@ -125,16 +130,11 @@ class LivePlayer():
         pass
     def pop_top_move(self):
         return self.move_queue.pop(0) if self.move_queue else None
-    def on_board_update(self, board: list[list[Tile]], board_diff: list[Tile]):
+    async def on_board_update(self, board: list[list[Tile]], board_diff: list[Tile]):
         # Subclasses must implement this
         raise NotImplementedError
-class BotPlayer(LivePlayer):
-    def __init__(self, agent: Agent):
-        self.agent = agent
-        super()
 
-    def on_board_update(self, board: list[list[Tile]], board_diff: list[Tile]):
-        self.move_queue = [self.agent.move(board)[0]]
+# A human player is pretty simple, we just send  game updates directly to the client.
 class HumanPlayer(LivePlayer):
     # todo: separate player id from socket id?
     def __init__(self, player_id: str, username: str, live_game: LiveGame, player_index: int):
@@ -147,7 +147,6 @@ class HumanPlayer(LivePlayer):
         self.game_state = {}
         super()
     def set_move_queue(self, move_queue: list[action.Action]):
-        print('setting player move queue', move_queue)
         self.move_queue = move_queue
 
     def handle_disconnect(self):
@@ -157,7 +156,7 @@ class HumanPlayer(LivePlayer):
         emit('game_start', {'board_state': board.serialize(), 'player_index': self.player_index}, to=self.player_id)
 
     # Only send to the player the diff
-    def on_board_update(self, board: list[list[Tile]], board_diff: list[Tile]):
+    async def on_board_update(self, board: list[list[Tile]], board_diff: list[Tile]):
         # Todo: don't do this for each player.
         emit('board_update', {'board_diff': [tile.serialize() for tile in board_diff], 'move_queue': [action.serialize() for action in self.move_queue]}, to=self.player_id)
         
@@ -165,7 +164,18 @@ class HumanPlayer(LivePlayer):
     def disseminate_game_over(self, winner_player_id):
         emit('game_over', {'winning_player': winner_player_id})
 
+# Small wrapper around a bot to give it the same interface as a human.
+# Instead of sending board updates, we use them to trigger an update to the
+# bot's move queue.
+class BotPlayer(LivePlayer):
+    def __init__(self, agent: Agent):
+        self.agent = agent
+        super()
 
+    async def on_board_update(self, board: list[list[Tile]], board_diff: list[Tile]):
+        next_move = await self.agent.move(board)
+        if next_move is not None:
+            self.move_queue = [next_move]
 
 class UserState(Enum):
     IN_LOBBY = 1
@@ -174,9 +184,13 @@ class UserState(Enum):
 
 
 
+# Added a layer of indirection here in case there are additional settings for a
+# bot
+# beyond which agent it uses to select its next move.
+# TODO: Maybe remove this?
 @dataclass
 class BotSpec:
-    model: str
+    agent: Agent
 
 @dataclass
 class ConnectedUser:

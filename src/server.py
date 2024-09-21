@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import asyncio
 from dataclasses import dataclass
 import logging
@@ -9,12 +8,9 @@ from flask import Flask, jsonify, request, make_response
 from flask_cors import CORS, cross_origin
 from flask_openapi3 import OpenAPI, Info, Tag
 
+from src.agents.random_agent import RandomAgent
 
-=======
-from pathlib import Path
-from flask import Flask, request
-from flask import make_response
->>>>>>> origin/ds/main
+
 
 import argparse
 
@@ -26,7 +22,7 @@ from flask_socketio import SocketIO
 from src.api_types import ErrorResponse, ReplayResponse
 from src.environment.action import Action, get_direction_from_str
 
-from src.live_game import LivePlayer, UserState, ConnectedUser, LiveGame
+from src.live_game import BotPlayer, LivePlayer, UserState, ConnectedUser, LiveGame
 
 __dirname__ = os.path.dirname(__file__)
 ROOT_DIR = Path(__dirname__).parent
@@ -114,11 +110,15 @@ def consider_starting_game():
 
 @socketio.on('join-game')
 def handle_join_game(data):
-    print("joining game")
-    if data["playBot"] == True:
-    else:
-        connected_users[request.sid].status = UserState.IN_QUEUE
-        consider_starting_game()
+    match data.get("opponentType"):
+        case "human":
+            connected_users[request.sid].status = UserState.IN_QUEUE
+            consider_starting_game()
+        case "random":
+            new_game = LiveGame([connected_users[request.sid], BotPlayer(RandomAgent(1, 5))])
+            asyncio.run(new_game.start_game())
+        case _:
+            raise ValueError(f"Invalid bot type: {data.get('opponentType')}")
 
 
 @socketio.on('disconnect')

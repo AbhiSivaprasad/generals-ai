@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Board from '../../components/board';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import socket, { BoardStateMessage, BoardUpdateMessage } from '../../socketio/client';
 import { coalesceMoveQueues, patch } from '../../utils/board';
 import { Action, CellState, serverActionToAction } from '../types/globals';
@@ -21,7 +21,7 @@ interface GameOverState {
 type GameState = GamePlayingState | GameOverState
 
 const GamePage: React.FC = () => {
-    const { id } = useParams();  // Extract the dynamic route parameter
+    const searchParams = useSearchParams();  // Extract the dynamic route parameter
     const [moveQueue, setMoveQueue] = useState<Action[]>([]);
     const [board, setBoard] = useState<CellState[][] | null>(null);
     // The index of the player in the game
@@ -155,7 +155,8 @@ const GamePage: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        socket.emit('join-game', { playBot: true });
+        const opponentType = searchParams.get('opponentType') as "human" | "random";
+        socket.emit('join-game', { opponentType });
         socket.on('game_start', (board_state: BoardStateMessage) => {
             // Save the board state to local storage
             localStorage.setItem('board_state', JSON.stringify(board_state));

@@ -19,7 +19,7 @@ export interface GameOverMessage {
 }
 
 export interface JoinGameMessage {
-    playBot: boolean
+    opponentType: "human" | "random"
 }
 
 interface ServerToClientEvents {
