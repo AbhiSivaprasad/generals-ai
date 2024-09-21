@@ -35,7 +35,7 @@ class LiveGame(GameMaster):
         self.live_players = []
         self.live_players = [self.create_live_player(init, idx, self) for idx, init in enumerate(player_inits)]
         self.game_id = uuid.uuid4()
-        super().__init__(board_init)
+        super().__init__(board_init, self.live_players)
     
     def create_live_player(self, player_init, player_index, game):
         if isinstance(player_init, ConnectedUser):
@@ -81,19 +81,6 @@ class LiveGame(GameMaster):
                     tiles_changed.append(self.state.board.grid[y][x])
         return tiles_changed
 
-    def update_player_stats(self):
-        total_armies = [0 for _ in range(len(self.live_players))]
-        total_land = [0 for _ in range(len(self.live_players))]
-        for y in range(self.state.board.num_rows):
-            for x in range(self.state.board.num_cols):
-                tile = self.state.board.grid[y][x]
-                if tile.player_index is not None:
-                    total_land[tile.player_index] += 1
-                    total_armies[tile.player_index] += tile.army
-        for player in self.live_players:
-            player.land_count = total_land[player.player_index]
-            player.army_count = total_armies[player.player_index]
-
 
     async def play(self):
         """
@@ -102,8 +89,9 @@ class LiveGame(GameMaster):
         :return: index of winning player or -1 if max turns reached
         """
         self.is_playing = True
+        player_names = [player.name() for player in self.live_players]
         for player in self.live_players:
-            player.disseminate_game_start(self.state.board)
+            player.disseminate_game_start(self.state, player_names)
         await asyncio.sleep(0.5)
         while self.state.board.terminal_status() == -1 and (self.max_turns is None or self.state.turn < self.max_turns) and self.is_playing:
             print('self turn is', self.state.turn)
@@ -129,7 +117,7 @@ class LiveGame(GameMaster):
 
             # game logic to add troops to generals, cities, and land on specific ticks
             self.add_troops_to_board()
-            self.update_player_stats()
+            self.recalculate_player_scores()
 
             self.process_board_update(previous_board_serialized)
                 
@@ -146,9 +134,12 @@ class LivePlayer():
     def __init__(self, player_index: int):
         self.move_queue = []
         self.player_index = player_index
-    def disseminate_game_start(self, board: Board):
+
+    def name(self):
+        raise NotImplementedError
+    def disseminate_game_start(self, state: GameState, player_names: list[str]):
         pass
-    def disseminate_game_voer(self, winner_player_id):
+    def disseminate_game_over(self, winner_player_id):
         pass
     def pop_top_move(self):
         return self.move_queue.pop(0) if self.move_queue else None
@@ -173,11 +164,14 @@ class HumanPlayer(LivePlayer):
         print('SETTING MOVE QUEUE')
         self.move_queue = move_queue
 
+    def name(self):
+        return self.username
+
     def handle_disconnect(self):
         self.game.handle_disconnect_player(self.player_id)
 
-    def disseminate_game_start(self, board: Board):
-        emit('game_start', {'board_state': board.serialize(), 'player_index': self.player_index}, to=self.player_id)
+    def disseminate_game_start(self, state: GameState, player_names: list[str]):
+        emit('game_start', {'board_state': state.board.serialize(), 'player_names': player_names, 'player_index': self.player_index}, to=self.player_id)
 
     def pop_top_move(self):
         self.server_consumed_moves += 1
@@ -186,7 +180,7 @@ class HumanPlayer(LivePlayer):
     # Only send to the player the diff
     async def on_board_update(self, game_state: GameState, board_diff: list[Tile]):
         # Todo: don't do this for each player.
-        emit('board_update', {'board_diff': [tile.serialize() for tile in board_diff], 'server_consumed_moves': self.server_consumed_moves, 'move_queue': [action.serialize() for action in self.move_queue]}, to=self.player_id)
+        emit('board_update', {'board_diff': [tile.serialize() for tile in board_diff], 'army_counts': game_state.army_counts, 'land_counts': game_state.land_counts, 'server_consumed_moves': self.server_consumed_moves, 'move_queue': [action.serialize() for action in self.move_queue]}, to=self.player_id)
         self.server_consumed_moves = 0
         
     
@@ -200,6 +194,9 @@ class BotPlayer(LivePlayer):
     def __init__(self, player_index: int, agent: Agent):
         self.agent = agent
         super().__init__(player_index)
+    
+    def name(self):
+        return "Some Bot"
 
     async def on_board_update(self, game_state: GameState, board_diff: list[Tile]):
         next_move = self.agent.move(game_state)

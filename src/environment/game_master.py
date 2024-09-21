@@ -20,7 +20,7 @@ class GameMaster:
     def __init__(self, board: Board, players: List[Agent] = [], max_turns=None, logger:Logger=None, normal_tile_increment_frequency: int = 50):
         self.logger = logger
         self.players = players
-        self.state = GameState(board, [0] * len(players), 0)
+        self.state = GameState(board, [0] * len(players), [0] * len(players), 0)
         self.max_turns = max_turns
         self.normal_tile_increment_frequency = normal_tile_increment_frequency
 
@@ -77,6 +77,7 @@ class GameMaster:
 
         # game logic to add troops to generals, cities, and land on specific ticks
         self.add_troops_to_board()
+        self.recalculate_player_scores()
         self.state.turn += 1
 
     def add_troops_to_board(self):
@@ -101,6 +102,17 @@ class GameMaster:
                 ):
                     tile.army += 1
                     self._log(tile)
+    
+    def recalculate_player_scores(self):
+        """recalculate player scores based on current board state"""
+        self.state.army_counts = [0] * len(self.players)
+        self.state.land_counts = [0] * len(self.players)
+        for i in range(self.state.board.num_rows):
+            for j in range(self.state.board.num_cols):
+                tile = self.state.board.grid[i][j]
+                if tile.player_index is not None:
+                    self.state.army_counts[tile.player_index] += tile.army
+                    self.state.land_counts[tile.player_index] += 1
 
     def update_game_state(self, action: Action):
         """

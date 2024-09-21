@@ -4,11 +4,14 @@ import { Action, BoardDiff, BoardState, ServerAction } from "../app/types/global
 export interface BoardStateMessage {
     board_state: BoardState;
     player_index: number;
+    player_names: string[];
     game_id: string;
 }
 
 export interface BoardUpdateMessage {
     board_diff: BoardDiff;
+    land_counts: number[];
+    army_counts: number[];
     move_queue: ServerAction[];
     server_consumed_moves: number;
 }

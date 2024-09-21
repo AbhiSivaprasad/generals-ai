@@ -12,7 +12,8 @@ from src.environment.tile import Tile, TileType
 @dataclass
 class GameState(object):
     board: Board
-    scores: List[int] # not functional / not in use yet
+    land_counts: List[int] # not functional / not in use yet
+    army_counts: List[int] # not functional / not in use yet
     turn: int
     terminal_status: int = -1
     

@@ -24,6 +24,9 @@ const GamePage: React.FC = () => {
     const searchParams = useSearchParams();  // Extract the dynamic route parameter
     const router = useRouter();
     const [moveQueue, setMoveQueue] = useState<Action[]>([]);
+    const [landCounts, setLandCounts] = useState<number[]>([]);
+    const [armyCounts, setArmyCounts] = useState<number[]>([]);
+    const [playerNames, setPlayerNames] = useState<string[]>([]);
     const [board, setBoard] = useState<CellState[][] | null>(null);
     // The index of the player in the game
     const [playerIndex, setPlayerIndex] = useState<number | null>(null);
@@ -163,6 +166,7 @@ const GamePage: React.FC = () => {
             // Save the board state to local storage
             setBoard(board_state.board_state);
             setPlayerIndex(board_state.player_index)
+            setPlayerNames(board_state.player_names)
             console.log("adding keypress listener")
             window.addEventListener('keypress', keyPressHandlerFactory(board_state.board_state.length, board_state.board_state[0].length));
         })
@@ -186,6 +190,9 @@ const GamePage: React.FC = () => {
                 patch(newBoard, board_update.board_diff);
                 return newBoard;
             });
+            console.log('player scores are', board_update.player_scores)
+            setLandCounts(board_update.land_counts);
+            setArmyCounts(board_update.army_counts);
             // TODO: Unify the client and server move queue types
             setMoveQueue((moveQueue) => {
                 return hasQueueBeenResetSinceLastServerUpdate.current ? moveQueue : moveQueue.slice(board_update.server_consumed_moves);
@@ -218,10 +225,34 @@ const GamePage: React.FC = () => {
 
     return (
         <div className="overflow-hidden">
-            <div>Playing Game</div>
-            <div>
-                Fog of war
-                <input type="checkbox" checked={fogOfWarEnabled} onChange={(e) => setFogOfWarEnabled(e.target.checked)} />
+            <div className="text-2xl font-bold text-center py-4 bg-blue-600 text-white">Playing Game</div>
+            <div className='fixed top-4 right-4 w-64 bg-white rounded-lg shadow-lg p-4'>
+                <h2 className="text-xl font-semibold mb-2">Scores</h2>
+                <table className="w-full">
+                    <thead>
+                        <tr className="bg-gray-100">
+                            <th className="py-2">Player</th>
+                            <th className="py-2">Land</th>
+                            <th className="py-2">Army</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {playerNames.map((name, index) => (
+                            <tr key={index} className="border-b">
+                                <td className="py-2">{name}</td>
+                                <td className="py-2 text-center">{landCounts[index]}</td>
+                                <td className="py-2 text-center">{armyCounts[index]}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            <div className="fixed bottom-4 left-4 bg-white rounded-lg shadow-lg p-4 flex items-center space-x-2">
+                <span className="font-medium">Fog of War</span>
+                <label className="inline-flex items-center cursor-pointer">
+                    <input type="checkbox" checked={fogOfWarEnabled} onChange={(e) => setFogOfWarEnabled(e.target.checked)} className="sr-only peer" />
+                    <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
             </div>
             <div>
                 <Button onClick={() => router.push('/')}>Back to Main Menu</Button>
