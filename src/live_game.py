@@ -119,8 +119,8 @@ class LiveGame(GameMaster):
 class LivePlayer():
     def __init__(self):
         self.move_queue = []
-    def disseminate_game_start(self, board: Brd):
-        pas
+    def disseminate_game_start(self, board: Board):
+        pass
     def disseminate_game_voer(self, winner_player_id):
         pass
     def pop_top_move(self):
