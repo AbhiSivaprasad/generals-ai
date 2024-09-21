@@ -31,12 +31,7 @@ from src.live_game import LivePlayer, UserState, ConnectedUser, LiveGame
 __dirname__ = os.path.dirname(__file__)
 ROOT_DIR = Path(__dirname__).parent
 
-<<<<<<< HEAD
 print('name is', __name__)
-=======
-ROOT_DIR = Path(__dirname__).parent
-
->>>>>>> origin/ds/main
 app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -45,7 +40,6 @@ api = OpenAPI(__name__, info=info)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.WARNING)  # or logging.CRITICAL to suppress more logs
 
-<<<<<<< HEAD
 # high level, the server mantains two pices of state:
 
 # Mapping from socket id to the player
@@ -73,9 +67,6 @@ def get_openapi_spec():
 
 
 @api.get("/replay/<path:replay_path>", responses={200: ReplayResponse, 404: ErrorResponse})
-=======
-@app.route("/replay/<path:replay_path>")
->>>>>>> origin/ds/main
 def serve_replay(replay_path):
     print("request for replay path:", replay_path)
 
@@ -86,11 +77,7 @@ def serve_replay(replay_path):
     if not replay_full_path.is_file() or not replay_full_path.is_relative_to(
         ROOT_DIR / "resources/replays"
     ):
-<<<<<<< HEAD
         return ErrorResponse(detail="Replay not found"), 404
-=======
-        return "Replay not found", 404
->>>>>>> origin/ds/main
 
     with open(replay_full_path, "r") as file:
         r = make_response(file.read())
