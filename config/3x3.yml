@@ -1,0 +1,18 @@
+seed: 97
+input_channels: 7
+num_actions: 37
+n_rows: 3
+n_cols: 3
+
+memory_capacity: 1000000
+wait_buffer_size: 200000
+target_update_freq: 2000
+
+num_steps: 100000
+learning_rate: 0.00002
+batch_size: 8192
+
+gamma: 0.9
+
+use_wandb: True
+wandb_project: "generals-ai"

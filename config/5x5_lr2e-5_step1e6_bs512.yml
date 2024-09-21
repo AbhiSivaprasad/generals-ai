@@ -1,0 +1,19 @@
+seed: 113
+input_channels: 7
+num_actions: 101
+n_rows: 5
+n_cols: 5
+
+memory_capacity: 1000000
+wait_buffer_size: 200000
+target_update_freq: 5000
+
+num_steps: 100000
+learning_rate: 0.0003
+batch_size: 8192
+
+gamma: 0.0
+
+use_wandb: True
+wandb_project: "generals-ai"
+wandb_run_name: "5x5_lr2e-5_step1e6_bs512_tgt1e3"

@@ -1,6 +1,11 @@
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Tuple
+<<<<<<< HEAD
+=======
+
+import numpy as np
+>>>>>>> origin/ds/main
 
 
 class Direction(int, Enum):
@@ -22,52 +27,44 @@ def get_direction_from_str(direction_str: str) -> Direction:
 
 @dataclass
 class Action:
-    """
-    If do_nothing is True, the agent decides to wait.
-    If do_nothing is False, the agent decides to move, and startx, starty, and direction are set.
-    """
-
-    do_nothing: bool = False
-    startx: Optional[int] = None
-    starty: Optional[int] = None
-    direction: Optional[Direction] = None
-
-    def serialize(self) -> dict:
-        return {
-            'do_nothing': self.do_nothing,
-            'startx': self.startx,
-            'starty': self.starty,
-            'direction': self.direction.name if self.direction else None
-        }
-
-    def to_index(self, n_columns: int):
-        if self.do_nothing:
+    startx: int
+    starty: int
+    direction: Direction
+    
+    @classmethod
+    def to_space_sample(cls, action: Optional["Action"], num_rows: int, num_col: int) -> int:
+        if action is None:
             return 0
-        else:
-            return (
-                1 + self.startx * 4 + self.starty * n_columns * 4 + self.direction.value
-            )
-
-    @staticmethod
-    def from_index(action_index: int, n_columns: int) -> Optional["Action"]:
-        if action_index == 0:
-            # agent decides to wait
-            return Action(do_nothing=True, startx=None, starty=None, direction=None)
-
-        # agent decides to move
-        action_index -= 1
-        x = (action_index // 4) % n_columns
-        y = action_index // (4 * n_columns)
-        direction = action_index % 4
-        return Action(startx=x, starty=y, direction=Direction(direction))
+        return np.ravel_multi_index((action.starty, action.startx, action.direction.value), (num_rows, num_col, 4)) + 1
+    
+    @classmethod
+    def from_space_sample(cls, sample: int, num_rows: int, num_col: int) -> "Action":
+        # 0 is None action
+        if sample == 0:
+            return None
+        # sample - 1 is the unraveled index
+        sample = sample - 1
+        y, x, dir = np.unravel_index(sample, (num_rows, num_col, 4))
+        direction = Direction(dir)
+        return cls(x, y, direction)
 
 
 def convert_direction_to_vector(direction: Direction) -> Tuple[int, int]:
-    if direction == Direction.DOWN:
-        return 0, 1
-    elif direction == Direction.UP:
+    if direction == Direction.UP:
         return 0, -1
+    elif direction == Direction.DOWN:
+        return 0, 1
     elif direction == Direction.LEFT:
         return -1, 0
     elif direction == Direction.RIGHT:
         return 1, 0
+
+def convert_vector_to_direction(vector: Tuple[int, int]) -> Direction:
+    if vector == (0, -1):
+        return Direction.UP
+    elif vector == (0, 1):
+        return Direction.DOWN
+    elif vector == (-1, 0):
+        return Direction.LEFT
+    elif vector == (1, 0):
+        return Direction.RIGHT

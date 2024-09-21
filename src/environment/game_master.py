@@ -1,49 +1,63 @@
-import random as rand
-
-import math
-from typing import List
-
 from src.environment.board import Board
+from src.environment.gamestate import GameState
 from src.environment.logger import Logger
 from src.environment.tile import TileType
 from src.environment.action import Action
+from src.agents.agent import Agent
+
+from typing import Any, Generator, Iterable, List, Optional
 
 
 class GameMaster:
     """
     handles game state
     """
+    players: List[Agent]
+    state: GameState
+    max_turns: Optional[int]
+    logger: Optional[Logger]
 
-    def __init__(
-        self,
-        board: Board,
-        players,
-        max_turns=None,
-        normal_tile_increment_frequency: int = 50,
-        logger: Logger = None,
-    ):
-        self.board = board
-        self.board.player_index = None
+    def __init__(self, board: Board, players: List[Agent], max_turns=None, logger:Logger=None, normal_tile_increment_frequency: int = 50):
         self.logger = logger
         self.players = players
-        self.turn = 0
+        self.state = GameState(board, [0] * len(players), 0)
         self.max_turns = max_turns
         self.normal_tile_increment_frequency = normal_tile_increment_frequency
 
         if self.logger is not None:
             # log initial board configuration
-            self.logger.init(self.board)
+            self.logger.init(self.state.board)
+    
+    def step(self) -> GameState:
+        if self.state.board.terminal_status() != -1 or (self.max_turns is not None and self.state.turn >= self.max_turns):
+            return self.state
+        
+        # each player outputs a move given their view
+        for moving_player_index, player in list(enumerate(self.players)):
+            action = player.move(self.state)
+            if action is None:
+                continue
+            # check for validity of action
+            if not self.state.board.is_action_valid(action, moving_player_index):
+                continue
+            # update game board with player's action
+            self.update_game_state(action)
+            
+        # game logic to add troops to generals, cities, and land on specific ticks
+        self.add_troops_to_board()
+        self.state.turn += 1
+        self.state.terminal_status = self.state.board.terminal_status()
+        return self.state            
 
     def play(self):
         """
         conduct game between players on given board
         :return: index of winning player or -1 if max turns reached
         """
-        while self.board.terminal_status() == -1 and self.turn < self.max_turns:
-            actions = [player.move(self.board)[0] for player in self.players]
-            self.step(actions)
-
-        return self.board.terminal_status()
+        assert len(self.players) == 2 and self.players[0] is not None and self.players[1] is not None, "Game must have 2 players."
+        while self.state.board.terminal_status() == -1 and (self.max_turns is None or self.state.turn < self.max_turns):
+            self.step()
+        return self.state.board.terminal_status()
 
     def step(self, actions: List[Action]):
         """
@@ -68,20 +82,21 @@ class GameMaster:
     def add_troops_to_board(self):
         """increment all troops on captured cities or generals"""
         # only increment troops on even turns
-        for i in range(self.board.num_rows):
-            for j in range(self.board.num_cols):
-                tile = self.board.grid[i][j]
+        if self.state.turn % 2 == 1:
+            return
+
+        for i in range(self.state.board.num_rows):
+            for j in range(self.state.board.num_cols):
+                tile = self.state.board.grid[i][j]
 
                 # increment generals and captured cities every 2 turns
-                if (tile.type == TileType.GENERAL and self.turn % 2 == 0) or (
-                    tile.player_index is not None
-                    and (
-                        tile.type == TileType.CITY
-                        and self.turn % 2 == 0
-                        or (
-                            tile.type == TileType.NORMAL
-                            and self.turn % self.normal_tile_increment_frequency == 0
-                        )
+                # increment player's land every 50 turns
+                if (
+                    tile.type == TileType.GENERAL
+                    or
+                    (tile.player_index is not None and
+                     (tile.type == TileType.CITY or
+                      (tile.type == TileType.NORMAL and self.state.turn % (25 * 2) == 0))
                     )
                 ):
                     tile.army += 1
@@ -93,8 +108,8 @@ class GameMaster:
         :param move:
         """
         updated_tiles = []
-        start_tile = self.board.grid[action.starty][action.startx]
-        dest_tile = self.board._get_destination_tile(start_tile, action)
+        start_tile = self.state.board.grid[action.starty][action.startx]
+        dest_tile = self.state.board._get_destination_tile(start_tile, action)
 
         if dest_tile.player_index == start_tile.player_index:
             # player moving into his own tile
@@ -112,14 +127,14 @@ class GameMaster:
                 if old_dest_player_index is not None:
                     # tile was captured
                     updated_tiles.extend(
-                        self.board.update_vision_from_captured_tile(
+                        self.state.board.update_vision_from_captured_tile(
                             dest_tile, old_dest_player_index
                         )
                     )
 
                 # add vision to newly owned tile
                 updated_tiles.extend(
-                    self.board.add_vision(dest_tile, start_tile.player_index)
+                    self.state.board.add_vision(dest_tile, start_tile.player_index)
                 )
             else:
                 # attack is unsuccessful--destination cell is not fully captured
@@ -137,4 +152,4 @@ class GameMaster:
 
     def _log(self, tile):
         if self.logger is not None:
-            self.logger.log(tile, self.turn)
+            self.logger.log(tile, self.state.turn)

@@ -1,13 +1,17 @@
 from collections import deque
-from typing import List, Set
-from src.environment.action import Action, convert_direction_to_vector
-from src.environment.tile import Tile, TileType
-
+from typing import List, Optional, Set
+from src.environment.action import Action, Direction, convert_direction_to_vector
+from src.environment.tile import Tile, TileType 
 
 class Board:
     """
     Board a representation of the board with necessary helper methods
     """
+    num_cols: int
+    num_rows: int
+    cities: List[Tile]
+    generals: List[Tile]
+    grid: List[List[Tile]]
 
     def __init__(self, num_rows: int, num_cols: int):
         self.num_rows = num_rows
@@ -26,6 +30,9 @@ class Board:
         check if game is over
         :return: if unfinished return -1 else return player index of victory
         """
+        if self.generals[0] is None or self.generals[1] is None:
+            return -1
+        
         if self.generals[1].player_index == 0:  # player 0 captured player 1's general
             return 0
         elif self.generals[0].player_index == 1:  # player 1 captured player 0's general
@@ -66,7 +73,7 @@ class Board:
         """
         return [[tile.serialize() for tile in row] for row in self.grid]
 
-    def is_action_valid(self, action: Action, player_index: int):
+    def is_action_valid(self, action: Optional[Action], player_index: int):
         """
         Check if player's action is valid
 
@@ -76,10 +83,9 @@ class Board:
         3. player owns start tile
         4. more than one troop on start tile
         """
-        # check if agent decides to wait
-        if action.do_nothing:
+        if action is None:
             return True
-
+        
         # check that start tile is within bounds and not a mountain
         if not self.is_valid_position(action.startx, action.starty):
             return False
@@ -88,7 +94,7 @@ class Board:
 
         # check that destination tile is within bounds and not a mountain
         destination_tile = self._get_destination_tile(start_tile, action)
-        if destination_tile is None:
+        if destination_tile is None or destination_tile.type == TileType.MOUNTAIN:
             return False
 
         print('tile owner is', start_tile.player_index, 'player index is', player_index)
@@ -101,6 +107,16 @@ class Board:
             return False
 
         return True
+    
+    def get_valid_actions(self, player_index: int) -> List[Action]:
+        valid_actions = []
+        for i in range(self.num_rows):
+            for j in range(self.num_cols):
+                for direction in Direction:
+                    action = Action(startx=j, starty=i, direction=direction)
+                    if self.is_action_valid(action, player_index):
+                        valid_actions.append(action)
+        return valid_actions
 
     def add_troops_to_board(self):
         """increment all troops on captured cities or generals"""
@@ -140,10 +156,10 @@ class Board:
         add vision for player to all tiles surrounding provided tile
         """
         updated_tiles = []
-        for tile in self.surrounding_tiles(tile):
-            if not tile.player_visibilities[player_index]:
-                tile.player_visibilities[player_index] = True
-                updated_tiles.append(tile)
+        for t in self.surrounding_tiles(tile) + [tile]:
+            if not t.player_visibilities[player_index]:
+                t.player_visibilities[player_index] = True
+                updated_tiles.append(t)
         return updated_tiles
 
     def update_vision_from_captured_tile(self, tile: Tile, player_index: int):
@@ -152,10 +168,10 @@ class Board:
         """
         # the player should not own the tile if the vision the tile produces is removed
         updated_tiles = []
-        for tile in self.surrounding_tiles(tile):
-            old_vision = tile.player_visibilities[player_index]
-            self.update_vision(tile, player_index)
-            if old_vision != tile.player_visibilities[player_index]:
+        for t in self.surrounding_tiles(tile) + [tile]:
+            old_vision = t.player_visibilities[player_index]
+            self.update_vision(t, player_index)
+            if old_vision != t.player_visibilities[player_index]:
                 updated_tiles.append(tile)  # tile vision changed
         return updated_tiles
 
@@ -164,8 +180,8 @@ class Board:
         given a tile, compute the vision of the tile
         """
         has_vision = False
-        for tile in self.surrounding_tiles(tile):
-            if tile.player_index == player_index:
+        for t in self.surrounding_tiles(tile) + [tile]:
+            if t.player_index == player_index:
                 # found a surrounding tile owned by the player, so add vision
                 has_vision = True
 

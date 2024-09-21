@@ -142,4 +142,8 @@ Werkzeug==3.0.3
 wrapt==1.16.0
 yarl==1.9.4
 zope.event==5.0
+<<<<<<< HEAD
 zope.interface==7.0.1
+=======
+zope.interface==7.0.1
+>>>>>>> origin/ds/main
