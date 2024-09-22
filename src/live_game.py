@@ -18,6 +18,9 @@ from src.environment.game_master import GameMaster
 from src.environment.gamestate import GameState
 from src.environment.tile import Tile
 
+TICK_TIME = 0.5
+
+
 
 # This class represents a live game that takes place on the server.
 #
@@ -92,7 +95,7 @@ class LiveGame(GameMaster):
         player_names = [player.name() for player in self.live_players]
         for player in self.live_players:
             player.disseminate_game_start(self.state, player_names)
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(TICK_TIME)
         while self.state.board.terminal_status() == -1 and (self.max_turns is None or self.state.turn < self.max_turns) and self.is_playing:
             print('self turn is', self.state.turn)
             # serialize the board so that we can send the diff
@@ -122,7 +125,7 @@ class LiveGame(GameMaster):
             self.process_board_update(previous_board_serialized)
                 
 
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(TICK_TIME)
             self.state.turn += 1
 
         if self.max_turns is not None and self.state.turn >= self.max_turns:
