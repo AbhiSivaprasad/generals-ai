@@ -190,7 +190,6 @@ const GamePage: React.FC = () => {
                 patch(newBoard, board_update.board_diff);
                 return newBoard;
             });
-            console.log('player scores are', board_update.player_scores)
             setLandCounts(board_update.land_counts);
             setArmyCounts(board_update.army_counts);
             // TODO: Unify the client and server move queue types
@@ -201,10 +200,6 @@ const GamePage: React.FC = () => {
 
 
     }, []);
-
-    // useEffect(() => {
-    //     console.log("board", board);
-    // }, [board])
 
     if (!board) {
         return (
@@ -239,7 +234,7 @@ const GamePage: React.FC = () => {
                     <tbody>
                         {playerNames.map((name, index) => (
                             <tr key={index} className="border-b">
-                                <td className="py-2">{name}</td>
+                                <td className={`py-2 ${index === playerIndex ? 'font-bold' : ''}`}>{name}</td>
                                 <td className="py-2 text-center">{landCounts[index]}</td>
                                 <td className="py-2 text-center">{armyCounts[index]}</td>
                             </tr>
