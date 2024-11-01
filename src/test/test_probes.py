@@ -1,25 +1,21 @@
 from pathlib import Path
-import unittest
+import argparse
 
 import gymnasium as gym
 import numpy as np
 
-from src.agents.random_agent import RandomAgent
-from src.environment.environment import GeneralsEnvironment
-import argparse
-
-from src.models.dqn_cnn import DQN
 from src.training.step import optimize_step
 from src.utils.replay_buffer import ListBuffer, ReplayBuffer
 
 import torch
 from torch import nn
-from torch.optim import AdamW
+from torch.optim import AdamW, Adam
 
-import src.test.probe_envs
+from src.test.probe_envs import ProbeDQN
 
-BATCH_SIZE = 256
-BOARD_SIZE = 3
+
+BATCH_SIZE = 4
+BOARD_SIZE = 1
 BOARD_CHANNELS = 1
 BUFFER_SIZE = 10_000
 GAMMA = lambda p: 0.0 if p in [1, 2, 4, 5] else 0.9
@@ -99,8 +95,8 @@ def probe6_assertion(env, dqn):
     
     assert np.argmax(q_val[0]) == 0, f"Expected better action to be 0, qvalues: {q_val[0]}"
     assert np.argmax(q_val[1]) == 1, f"Expected better action to be 1, qvalues: {q_val[1]}"
-    assert abs(q_val[0][0] - 1.9) < 1e-3, f"Expected q_val 1.9: {q_val[0][0]}"
-    assert abs(q_val[1][1] - 1.9) < 1e-3, f"Expected q_val 1.9: {q_val[1][1]}"
+    assert abs(q_val[0][0] - 1.9) < 1e-3, f"Expected q_val 1.9: {q_val[0][0]}, \n {q_val}"
+    assert abs(q_val[1][1] - 1.9) < 1e-3, f"Expected q_val 1.9: {q_val[1][1]}, \n {q_val}"
 
 
 def get_action(probe, obs, env, dqn):
@@ -117,7 +113,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser()
     parser.add_argument("--probe", type=int, default=1, help="Probe env #")
-    parser.add_argument("--verbose", type=bool, default=False, help="Verbosity")
+    parser.add_argument("--verbose", action="store_true", help="Verbosity")
     args = parser.parse_args()
     probe = args.probe
     
@@ -125,8 +121,8 @@ if __name__ == "__main__":
         
     env = gym.make(f"probe{probe}", n_rows=BOARD_SIZE, n_cols=BOARD_SIZE, n_channels=BOARD_CHANNELS)
     env.reset(seed=0)
-    dqn = DQN(BOARD_CHANNELS, N_ACTIONS(probe), BOARD_SIZE, BOARD_SIZE).to(device="cuda")
-    optimizer = AdamW(dqn.parameters(), lr=3e-4)
+    dqn = ProbeDQN(BOARD_CHANNELS, N_ACTIONS(probe), BOARD_SIZE, BOARD_SIZE).to(device="cuda")
+    optimizer = Adam(dqn.parameters(), lr=4e-3)
     
     gamma = GAMMA(probe)
     
@@ -144,6 +140,7 @@ if __name__ == "__main__":
                 data = buffer.sample(BATCH_SIZE)
                 experiences, steps = tuple(map(list, zip(*data)))
                 loss, step_info = optimize_step(dqn, dqn, optimizer, experiences, gamma)
+                
                 predicted_q_vals = step_info["predicted_q_vals"]
                 if args.verbose:
                     print(

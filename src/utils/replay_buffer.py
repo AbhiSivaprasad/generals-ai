@@ -8,8 +8,6 @@ import numpy as np
 import ray
 from src.environment import ObsType, ActType
 
-from torchrl.data import ReplayBuffer as TorchReplayBuffer, ListStorage
-
 # (state, act, reward, new_state, terminated)
 Experience = Tuple[ObsType, ActType, float, ObsType, bool]
 

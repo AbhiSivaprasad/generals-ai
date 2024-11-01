@@ -2,6 +2,7 @@ from typing import Dict, Optional, Tuple
 import gymnasium as gym
 from gymnasium import register
 import numpy as np
+from torch import nn
 
 from src.environment import ActType, ObsType
 
@@ -132,6 +133,7 @@ class ProbeSix(gym.Env):
         self.timestep = 0
 
     def reset(self, seed: Optional[int] = None, options=None) -> Tuple[ObsType, Dict]:
+        super().reset(seed=seed)
         self.timestep = 0
         self.obs_alpha = 1.0 if self.np_random.random() < 0.5 else 0.0
         return (0, self.obs_alpha * np.ones(self.shape)), {}
@@ -140,7 +142,7 @@ class ProbeSix(gym.Env):
         self.timestep += 1
         reward = 1.0 if abs(float(act) - self.obs_alpha) < 1e-3 else -1.0
         self.obs_alpha = 1.0 if self.np_random.random() < 0.5 else 0.0
-        done = self.timestep == 2
+        done = self.timestep >= 2
         return (self.timestep, self.obs_alpha * np.ones(self.shape)), reward, done, False, {}
 
     def write(self, path: str) -> None:
@@ -178,3 +180,44 @@ register(
      id="probe6",
      entry_point=ProbeSix,
 )
+
+
+
+
+
+class ProbeDQN(nn.Module):
+    """
+    DQN for probe envs. Much smaller.
+    """
+    def __init__(
+        self, 
+        input_channels, 
+        num_actions, 
+        n_rows, 
+        n_cols,
+        *args,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+        simple_dim = 16
+        self.simple_net = nn.Sequential(
+            nn.Conv2d(input_channels, simple_dim, 3, padding=1),
+            nn.MaxPool2d(n_rows, n_cols),
+            nn.Dropout(0.5),
+            nn.Flatten(),
+            nn.GELU(),
+            nn.Linear(simple_dim, 4 * simple_dim),
+            nn.GELU(),
+            nn.Linear(4 * simple_dim, simple_dim),
+            nn.Dropout(0.25),
+            nn.Linear(simple_dim, simple_dim),
+            nn.Linear(simple_dim, num_actions),
+        )
+
+    def forward(self, x):
+        x = x.permute(0, 3, 1, 2)
+        # x = self.encoder(x)
+        # x = self.blocks(x)
+        # x = self.fc_layers(x)
+        x = self.simple_net(x)
+        return x
