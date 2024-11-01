@@ -226,7 +226,9 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
         data = ray.get(buffer.sample.remote(config.batch_size))
         experiences, steps = tuple(map(list, zip(*data)))
         
-        loss, step_info = optimize_step(target_net, policy_net, optimizer, experiences, config.gamma)
+        gamma = config.gamma if train_step > int(0.1 * config.num_steps) else 0.0
+        
+        loss, step_info = optimize_step(target_net, policy_net, optimizer, experiences, gamma)
         
         predicted_q_vals = step_info["predicted_q_vals"]
         rewards = step_info["r_t_1"]
@@ -308,7 +310,7 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config_file", type=str, required=False, help="Path to a training config YAML file.")
+    parser.add_argument("--config", type=str, required=False, help="Path to a training config YAML file.")
     parser.add_argument("--address", type=str, required=False, help="Ray cluster address.")
     args = parser.parse_args()
 
@@ -359,12 +361,12 @@ if __name__ == "__main__":
     # time.sleep(10)
     # env_runners.extend([EnvRunner.remote(config=c, agent={"type": "humanexe"}, opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 10)])
     # time.sleep(10)
-    # env_runners.extend([EnvRunner.options(num_gpus=0.01).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.6, c.seed), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 25)])
-    # time.sleep(10)
+    env_runners.extend([EnvRunner.options(num_gpus=0.01).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.6, c.seed), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 25)])
+    time.sleep(10)
     env_runners.extend([EnvRunner.options(num_gpus=0.01).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.8, c.seed + 2**7 - 1), opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 25)])
     time.sleep(10)
-    env_runners.extend([EnvRunner.options(num_gpus=0.01).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.2, c.seed + 3**7 - 1), opponent=RandomAgent(1, 3 * (c.seed % 49) + c.seed), server=server, buffer=buffer) for c in random.sample(configs, 25)])
-    time.sleep(10)
+    # env_runners.extend([EnvRunner.options(num_gpus=0.01).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.2, c.seed + 3**7 - 1), opponent=RandomAgent(1, 3 * (c.seed % 49) + c.seed), server=server, buffer=buffer) for c in random.sample(configs, 25)])
+    # time.sleep(10)
 
     env_runners = [runner.run.remote() for runner in env_runners]
     sys.stdout.flush()
