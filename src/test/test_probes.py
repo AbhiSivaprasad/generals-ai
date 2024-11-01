@@ -6,19 +6,26 @@ import numpy as np
 
 from src.training.step import optimize_step
 from src.utils.replay_buffer import ListBuffer, ReplayBuffer
+from src.models.dqn_cnn import DQN
 
 import torch
 from torch import nn
-from torch.optim import AdamW, Adam
+from torch.optim import AdamW, Adam, SGD
 
-from src.test.probe_envs import ProbeDQN
+import src.test.probe_envs
 
 
-BATCH_SIZE = 4
-BOARD_SIZE = 1
-BOARD_CHANNELS = 1
+BATCH_SIZE = 512
+STEPS = 1_000
+
+BOARD_SIZE = 3
+BOARD_CHANNELS = 3
+
 BUFFER_SIZE = 10_000
+
 GAMMA = lambda p: 0.0 if p in [1, 2, 4, 5] else 0.9
+GAMMA_WARMUP = 0.2
+
 N_ACTIONS = \
     lambda p: \
         {
@@ -96,7 +103,7 @@ def probe6_assertion(env, dqn):
     assert np.argmax(q_val[0]) == 0, f"Expected better action to be 0, qvalues: {q_val[0]}"
     assert np.argmax(q_val[1]) == 1, f"Expected better action to be 1, qvalues: {q_val[1]}"
     assert abs(q_val[0][0] - 1.9) < 1e-3, f"Expected q_val 1.9: {q_val[0][0]}, \n {q_val}"
-    assert abs(q_val[1][1] - 1.9) < 1e-3, f"Expected q_val 1.9: {q_val[1][1]}, \n {q_val}"
+    assert abs(q_val[1][1] - 1.0) < 1e-3, f"Expected q_val 1.0 {q_val[1][1]}, \n {q_val}"
 
 
 def get_action(probe, obs, env, dqn):
@@ -121,12 +128,11 @@ if __name__ == "__main__":
         
     env = gym.make(f"probe{probe}", n_rows=BOARD_SIZE, n_cols=BOARD_SIZE, n_channels=BOARD_CHANNELS)
     env.reset(seed=0)
-    dqn = ProbeDQN(BOARD_CHANNELS, N_ACTIONS(probe), BOARD_SIZE, BOARD_SIZE).to(device="cuda")
-    optimizer = Adam(dqn.parameters(), lr=4e-3)
-    
-    gamma = GAMMA(probe)
-    
-    for i in range(1_000):
+    dqn = DQN(BOARD_CHANNELS, N_ACTIONS(probe), BOARD_SIZE, BOARD_SIZE).to(device="cuda")
+    optimizer = AdamW(dqn.parameters(), lr=4e-3)
+     
+     
+    while buffer.size() < 4 * BATCH_SIZE:
         obs, _ = env.reset()
         done = False
         while not done:
@@ -136,20 +142,27 @@ if __name__ == "__main__":
             buffer.add([((obs, action, reward, next_obs, done), 0)])
             obs = next_obs
             
-            if buffer.size() > 2 * BATCH_SIZE:
-                data = buffer.sample(BATCH_SIZE)
-                experiences, steps = tuple(map(list, zip(*data)))
-                loss, step_info = optimize_step(dqn, dqn, optimizer, experiences, gamma)
-                
-                predicted_q_vals = step_info["predicted_q_vals"]
-                if args.verbose:
-                    print(
-                        loss.item(), 
-                        predicted_q_vals.min().item(), 
-                        predicted_q_vals.max().item(), 
-                        predicted_q_vals.mean().item(), 
-                        predicted_q_vals.std().item()
-                    )
+    print("Training probe...")
+    
+    for i in range(STEPS):
+        gamma = GAMMA(probe) if float(i)/STEPS > GAMMA_WARMUP else 0.0
+        data = buffer.sample(BATCH_SIZE)
+        experiences, steps = tuple(map(list, zip(*data)))
+        loss, step_info = optimize_step(dqn, dqn, optimizer, experiences, gamma)
+        
+        if args.verbose:
+            # print(step_info)
+            predicted_q_vals = step_info["predicted_q_vals"]
+            print(
+                "STEP {i}:\n{loss}\t{min}\t{max}\t{mean}\t{std}".format(
+                    i=i,
+                    loss=loss.item(), 
+                    min=predicted_q_vals.min().item(), 
+                    max=predicted_q_vals.max().item(), 
+                    mean=predicted_q_vals.mean().item(), 
+                    std=predicted_q_vals.std().item()
+                )
+            )
     
     
     assert_fn = globals()[f"probe{probe}_assertion"]

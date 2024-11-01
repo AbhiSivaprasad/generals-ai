@@ -42,9 +42,9 @@ def optimize_step(target_net: nn.Module,
     target_next_q_value = target_next_q_value.cuda().requires_grad_(False)
     
     prediction_outputs = policy_net(s_t)
-    predicted_q_vals: torch.Tensor = prediction_outputs[range(batch_size), a_t]
+    predicted_q_vals: torch.Tensor = prediction_outputs[range(batch_size), a_t].flatten()
     
-    target_q_vals = r_t_1 + gamma * target_next_q_value * (1 - d_t_1)
+    target_q_vals = r_t_1.flatten() + gamma * target_next_q_value.flatten() * (1.0 - d_t_1.flatten())
     tde = target_q_vals - predicted_q_vals
     loss = tde.pow(2).mean()
     # loss = F.huber_loss(predicted_q_vals, target_q_vals)
@@ -60,6 +60,7 @@ def optimize_step(target_net: nn.Module,
         "a_t": a_t,
         "r_t_1": r_t_1,
         "d_t_1": d_t_1,
+        "max_action": max_action,
         "target_next_q_value": target_next_q_value,
         "target_q_vals": target_q_vals
     }
