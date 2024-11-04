@@ -253,6 +253,7 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
                 "grad_max": grad_max.item(),
                 "staleness_mean": staleness.mean(),
                 "staleness_std": staleness.std(),
+                "gamma": gamma
             }, step=train_step)
             
         if (train_step + 1) % config.target_update_freq == 0:
@@ -263,6 +264,7 @@ def train(config: DQNTrainingConfig, server: ray.ObjectRef, buffer: ray.ObjectRe
         
         if (train_step + 1) % (config.num_steps // 100) == 0:
             print("[INFO] Running validation episodes + checkpointing...")
+            os.makedirs("resources/checkpoints/", exist_ok=True)
             torch.save(policy_net, f"resources/checkpoints/step_{train_step}.ckpt")
             wandb.save("resources/checkpoints/*", base_path="resources/")
             
@@ -314,7 +316,7 @@ if __name__ == "__main__":
     parser.add_argument("--address", type=str, required=False, help="Ray cluster address.")
     args = parser.parse_args()
 
-    config_file = args.config_file
+    config_file = args.config
     address = args.address
     
     ray.init(address=address)
@@ -363,7 +365,7 @@ if __name__ == "__main__":
     # time.sleep(10)
     env_runners.extend([EnvRunner.options(num_gpus=0.01).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.6, c.seed), opponent={"type": "humanexe"}, server=server, buffer=buffer) for c in random.sample(configs, 25)])
     time.sleep(10)
-    env_runners.extend([EnvRunner.options(num_gpus=0.01).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.8, c.seed + 2**7 - 1), opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 25)])
+    env_runners.extend([EnvRunner.options(num_gpus=0.01).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.4, c.seed + 2**7 - 1), opponent=RandomAgent(1, c.seed), server=server, buffer=buffer) for c in random.sample(configs, 25)])
     time.sleep(10)
     # env_runners.extend([EnvRunner.options(num_gpus=0.01).remote(config=c, agent=EpsilonRandomAgent(DQNAgent(0, None, None), 0.2, c.seed + 3**7 - 1), opponent=RandomAgent(1, 3 * (c.seed % 49) + c.seed), server=server, buffer=buffer) for c in random.sample(configs, 25)])
     # time.sleep(10)

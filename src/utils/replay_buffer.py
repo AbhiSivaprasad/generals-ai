@@ -74,7 +74,7 @@ class ListBuffer(ReplayBuffer):
         return -1
 
 
-@ray.remote(num_cpus=1, memory=1*(1024**4), max_restarts=0, max_task_retries=0)
+@ray.remote(num_cpus=1, memory=64*(1024**3), max_restarts=0, max_task_retries=0)
 class RayReplayBuffer(ListBuffer):
     def __init__(self, capacity: int, seed: int):
         super().__init__(capacity, seed)

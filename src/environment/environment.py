@@ -1,6 +1,7 @@
 from typing import Dict, Optional, Tuple
 import numpy as np
 from copy import deepcopy
+import os
 
 import gymnasium.core as gym
 from gymnasium.spaces import Space, \
@@ -121,6 +122,7 @@ class GeneralsEnvironment(gym.Env):
         '''
         Write the environment to a file.
         '''
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         self.game.logger.write(path)
 
             
