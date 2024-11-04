@@ -20,10 +20,11 @@ from heapq_max import heappush_max, heappop_max
 
 from Interfaces import MapMatrixInterface, TileSet
 from Path import Path
-from test.test_float import INF
 from base.client.tile import Tile
 from base.client.map import MapBase, new_value_grid
 from MapMatrix import MapMatrix, MapMatrixSet
+
+INF = float("inf")
 
 BYPASS_TIMEOUTS_FOR_DEBUGGING = False
 
