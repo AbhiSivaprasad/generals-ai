@@ -34,34 +34,35 @@ import torch.nn.functional as F
 
 # %%
 from src.environment.environment import GeneralsEnvironment
+from src.environment.probes.probe0 import ProbeZeroEnvironment
 from src.agents.random_agent import RandomAgent
 from src.agents.curiousgeorge_agent import CuriousGeorgeAgent
-from src.training.dqn.dqn import DQN
+from src.training.models.dqn.dqn import DQN
+from src.training.models.fc_network import FCNetwork
 from src.training.input import (
     get_input_channel_dimension_size,
 )
-from src.training.dqn.replay_memory import ReplayMemory, Transition
+from src.training.models.dqn.replay_memory import ReplayMemory, Transition
 from src.environment.logger import Logger
 from src.training.utils import convert_agent_dict_to_tensor
-
-# %%
-# set up matplotlib
-is_ipython = "inline" in matplotlib.get_backend()
-if is_ipython:
-    from IPython import display
-
-plt.ion()
+from src.utils.scheduler import ExponentialHyperParameterSchedule
+from src.utils.utils import delete_directory_contents
+from src.environment.action import Action
+from src.environment.probes.probe1 import ProbeOneEnvironment
+from src.environment.probes.probe2 import ProbeTwoEnvironment
+from src.environment.probes.probe3 import ProbeThreeEnvironment
 
 # %%
 # if GPU is to be used
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # %%
+REPLAY_MEMORY_SIZE = 10000
 BATCH_SIZE = 128  # replay buffer sample size
-GAMMA = 0.99
+GAMMA = 0
 EPS_START = 0.9
 EPS_END = 0.05
-EPS_DECAY = 1000  # higher means slower exponential decay
+EPS_DECAY = 50000  # higher means slower exponential decay
 TAU = 0.005  # update rate of target network
 LR = 1e-4
 
@@ -69,53 +70,103 @@ LR = 1e-4
 N_ROWS = 2
 N_COLUMNS = 2
 FOG_OF_WAR = False
+NORMAL_TILE_INCREMENT_FREQUENCY = 2
 INPUT_CHANNELS = get_input_channel_dimension_size(FOG_OF_WAR)
+
+# %%
+# DQN params
 N_HIDDEN_CONV_LAYERS = 0
 N_HIDDEN_CONV_CHANNELS = 32
 KERNEL_SIZE = 2
+
+# FC params
+N_HIDDEN_LAYERS = 3
+N_HIDDEN_DIMENSION = 128
 
 # %%
 N_ACTIONS = 4 * N_ROWS * N_COLUMNS + 1
 AUXILIARY_REWARD_WEIGHT = 0.1
 
+
 # %%
-policy_net = DQN(
-    N_ROWS,
-    N_COLUMNS,
-    KERNEL_SIZE,
-    INPUT_CHANNELS,
-    N_ACTIONS,
-    N_HIDDEN_CONV_LAYERS,
-    N_HIDDEN_CONV_CHANNELS,
-).to(device)
-target_net = DQN(
-    N_ROWS,
-    N_COLUMNS,
-    KERNEL_SIZE,
-    INPUT_CHANNELS,
-    N_ACTIONS,
-    N_HIDDEN_CONV_LAYERS,
-    N_HIDDEN_CONV_CHANNELS,
-).to(device)
+def get_dqn_network():
+    return DQN(
+        n_rows=N_ROWS,
+        n_columns=N_COLUMNS,
+        kernel_size=KERNEL_SIZE,
+        input_channels=INPUT_CHANNELS,
+        n_actions=N_ACTIONS,
+        n_hidden_conv_layers=N_HIDDEN_CONV_LAYERS,
+        n_hidden_conv_channels=N_HIDDEN_CONV_CHANNELS,
+    ).to(device)
+
+
+def get_fc_network():
+    return FCNetwork(
+        n_rows=N_ROWS,
+        n_columns=N_COLUMNS,
+        n_actions=N_ACTIONS,
+        n_input_channels=INPUT_CHANNELS,
+        n_hidden_dim=N_HIDDEN_DIMENSION,
+        n_hidden_layers=N_HIDDEN_LAYERS,
+    ).to(device)
+
+
+def get_network(type: str):
+    if type == "dqn":
+        return get_dqn_network()
+    elif type == "fc":
+        return get_fc_network()
+    else:
+        raise ValueError("Invalid network type")
+
+
+# %%
+def get_model_params(model_type):
+    if model_type == "dqn":
+        return {
+            "kernel_size": KERNEL_SIZE,
+            "n_hidden_conv_layers": N_HIDDEN_CONV_LAYERS,
+            "n_hidden_conv_channels": N_HIDDEN_CONV_CHANNELS,
+        }
+    elif model_type == "fc":
+        return {
+            "n_hidden_dim": N_HIDDEN_DIMENSION,
+            "n_hidden_layers": N_HIDDEN_LAYERS,
+        }
+    else:
+        raise ValueError("Invalid network type")
+
+
+# %%
+model_type = "fc"
+policy_net = get_network(model_type)
+target_net = get_network(model_type)
 target_net.load_state_dict(policy_net.state_dict())
-env = GeneralsEnvironment(
+
+# %%
+# env = GeneralsEnvironment(
+env = ProbeThreeEnvironment(
     agents=[
         CuriousGeorgeAgent(
+            player_index=0,
             policy_net=policy_net,
-            eps_start=EPS_START,
-            eps_end=EPS_END,
-            eps_decay=EPS_DECAY,
+            epsilon_schedule=ExponentialHyperParameterSchedule(
+                initial_value=EPS_START, final_value=EPS_END, decay_rate=EPS_DECAY
+            ),
         ),
         CuriousGeorgeAgent(
+            player_index=1,
             policy_net=policy_net,
-            eps_start=EPS_START,
-            eps_end=EPS_END,
-            eps_decay=EPS_DECAY,
+            epsilon_schedule=ExponentialHyperParameterSchedule(
+                initial_value=EPS_START, final_value=EPS_END, decay_rate=EPS_DECAY
+            ),
         ),
     ],
     board_x_size=N_COLUMNS,
     board_y_size=N_ROWS,
     auxiliary_reward_weight=AUXILIARY_REWARD_WEIGHT,
+    normal_tile_increment_frequency=NORMAL_TILE_INCREMENT_FREQUENCY,
 )
 
 # %%
@@ -131,9 +182,9 @@ run = wandb.init(
         "eps_start": EPS_START,
         "eps_end": EPS_END,
         "eps_decay": EPS_DECAY,
-        "n_hidden_conv_layers": N_HIDDEN_CONV_LAYERS,
-        "n_hidden_conv_channels": N_HIDDEN_CONV_CHANNELS,
-        "kernel_size": KERNEL_SIZE,
+        "normal_tile_increment_frequency": NORMAL_TILE_INCREMENT_FREQUENCY,
+        "replay_memory_size": REPLAY_MEMORY_SIZE,
+        **get_model_params(model_type),
     },
 )
 
@@ -144,7 +195,7 @@ n_observations = len(state)
 
 # %%
 optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
-memory = ReplayMemory(10000)
+memory = ReplayMemory(REPLAY_MEMORY_SIZE)
 
 # %%
 steps_done = 0
@@ -165,7 +216,7 @@ def optimize_model():
         device=device,
         dtype=torch.bool,
     )
-    non_final_next_states = torch.stack([s for s in batch.next_state if s is not None])
+
     state_batch = torch.stack(batch.state)
     action_batch = torch.stack(batch.action)
     reward_batch = torch.stack(batch.reward)
@@ -175,16 +226,24 @@ def optimize_model():
     # for each batch state according to policy_net
     state_action_values = policy_net(state_batch).gather(1, action_batch.unsqueeze(1))
 
-    # Compute V(s_{t+1}) for all next states.
-    # Expected values of actions for non_final_next_states are computed based
-    # on the "older" target_net; selecting their best reward with max(1).values
-    # This is merged based on the mask, such that we'll have either the expected
-    # state value or 0 in case the state was final.
-    next_state_values = torch.zeros(BATCH_SIZE, device=device)
-    with torch.no_grad():
-        next_state_values[non_final_mask] = (
-            target_net(non_final_next_states).max(1).values
-        )
+    # look up our prediction for value of next state if its not a final state
+    non_final_next_states = [s for s in batch.next_state if s is not None]
+    if len(non_final_next_states) == 0:
+        next_state_values = torch.zeros(BATCH_SIZE, device=device)
+    else:
+        non_final_next_states = torch.stack(non_final_next_states)
+
+        # Compute V(s_{t+1}) for all next states.
+        # Expected values of actions for non_final_next_states are computed based
+        # on the "older" target_net; selecting their best reward with max(1).values
+        # This is merged based on the mask, such that we'll have either the expected
+        # state value or 0 in case the state was final.
+        next_state_values = torch.zeros(BATCH_SIZE, device=device)
+        with torch.no_grad():
+            next_state_values[non_final_mask] = (
+                target_net(non_final_next_states).max(1).values
+            )
+
     # Compute the expected Q values
     expected_state_action_values = (next_state_values * GAMMA) + reward_batch
 
@@ -202,9 +261,9 @@ def optimize_model():
 
     # metrics
     loss = loss.detach().item()
-    mean_reward = reward_batch.mean().item()
-    qvalue_norm = state_action_values.norm().item()
-    return loss, mean_reward, qvalue_norm
+    mean_reward = reward_batch.abs().mean().item()
+    qvalue_magnitude = state_action_values.abs().mean().item()
+    return loss, mean_reward, qvalue_magnitude
 
 
 # %%
@@ -213,10 +272,14 @@ LOG_DIR.mkdir(exist_ok=True, parents=True)
 CHECKPOINT_DIR = Path("resources/checkpoints")
 LOG_DIR.mkdir(exist_ok=True, parents=True)
 
+# delete old logs and checkpoints
+delete_directory_contents(LOG_DIR)
+delete_directory_contents(CHECKPOINT_DIR)
+
 # %%
-num_episodes = 1000
+num_episodes = 50000
 log_interval = 50
-checkpoint_interval = 50
+checkpoint_interval = 500
 global_step = 0
 for i_episode in range(num_episodes):
     logger = Logger()
@@ -225,11 +288,28 @@ for i_episode in range(num_episodes):
     convert_agent_dict_to_tensor(state, device=device)
     num_agents = len(env.unwrapped.agents)
     for t in count():
-        actions = {
+        actions_with_info = {
             agent_index: agent.move(state[agent_index], env)
             for agent_index, agent in enumerate(env.unwrapped.agents)
         }
-        observation, rewards, terminated, truncated, info = env.step(actions)
+        actions = {
+            agent_index: action
+            for agent_index, (action, _) in actions_with_info.items()
+        }
+
+        # check whether agent 0 took a legal move before taking the action
+        _, action_info = actions_with_info[0]
+        is_action_legal = env.unwrapped.game_master.board.is_action_valid(
+            Action.from_index(
+                action_info["best_action"], n_columns=env.unwrapped.board_x_size
+            ),
+            player_index=0,
+        )
+
+        # take action
+        observation, rewards, terminated, truncated, info = env.step(
+            actions, action_infos=actions_with_info
+        )
         convert_agent_dict_to_tensor(rewards, device=device)
         convert_agent_dict_to_tensor(actions, dtype=torch.long, device=device)
         truncated = list(truncated.values())[0]
@@ -258,22 +338,25 @@ for i_episode in range(num_episodes):
         # Perform one step of the optimization (on the policy network)
         metrics = optimize_model()
         if metrics is not None:
-            minibatch_loss, minibatch_reward, minibatch_qvalue_norm = metrics
+            minibatch_loss, minibatch_reward_magnitude, minibatch_qvalue_magnitude = (
+                metrics
+            )
             wandb.log(
                 {
-                    "step": global_step,
                     "loss": minibatch_loss,
-                    "reward": minibatch_reward,
-                    "qvalue_norm": minibatch_qvalue_norm,
-                }
+                    "reward_magnitude": minibatch_reward_magnitude,
+                    "qvalue_magnitude": minibatch_qvalue_magnitude,
+                },
+                step=global_step,
             )
 
-        legal_move_rate = list(info.values())[0]["is_game_action_legal"]
+        # log other metrics
         wandb.log(
             {
-                "step": global_step,
-                "legal_move": int(legal_move_rate),
-            }
+                "legal_move": int(is_action_legal),
+                "epsilon": env.unwrapped.agents[0].epsilon,
+            },
+            step=global_step,
         )
 
         # Soft update of the target network's weights
@@ -286,15 +369,15 @@ for i_episode in range(num_episodes):
             ] * TAU + target_net_state_dict[key] * (1 - TAU)
         target_net.load_state_dict(target_net_state_dict)
 
+        global_step += 1
+
         if done:
-            wandb.log({"step": global_step, "duration": t})
+            wandb.log({"duration": t, "episode": i_episode}, step=global_step)
             if i_episode % checkpoint_interval == 0:
                 policy_net.save_checkpoint(CHECKPOINT_DIR, i_episode)
             if i_episode % log_interval == 0:
                 logger.write(LOG_DIR / f"{i_episode}.json")
             break
-
-        global_step += 1
 
 # %%
 # !find resources/replays -mindepth 1 -print0 | xargs -0 -P $(nproc) rm -rf

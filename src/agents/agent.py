@@ -1,15 +1,17 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-import torch
+from src.environment.action import Action
+from src.environment.gamestate import GameState
 
 
-class Agent(ABC):
-    def __init__(self, player_index) -> None:
+class Agent(object):
+    player_index: int
+    
+    def __init__(self, player_index, *args, **kwargs) -> None:
         self.player_index = player_index
 
-    @abstractmethod
-    def move(self, state: torch.Tensor, env) -> int:
+    def move(self, state: GameState) -> Optional[Action]:
         """
         An agent returns an integer index representing the action it wants to take
         """
@@ -20,4 +22,10 @@ class Agent(ABC):
         """
         Reset the agent's state for a new game
         """
-        pass
+        raise NotImplementedError
+
+    def reset(self, *args, **kwargs) -> None:
+        """
+        Reset method. Good place to reset random seeds, agentstate variables, etc.
+        """
+        raise NotImplementedError
